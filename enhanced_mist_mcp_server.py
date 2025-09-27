@@ -4115,7 +4115,7 @@ async def get_org_evpn_topologies(org_id: str) -> str:
                 fabrics_data = json.loads(result.get("response_data", "[]"))
                 result["evpn_fabrics"] = fabrics_data
                 result["fabric_count"] = len(fabrics_data)
-                result["message"] = f"Retrieved {len(fabrics_data)} EVPN fabrics in organization"
+                result["message"] = f'Retrieved {len(fabrics_data)} EVPN fabrics in organization'
                 
                 # Topology analysis
                 org_topology_summary = []
