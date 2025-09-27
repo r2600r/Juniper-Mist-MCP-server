@@ -36,20 +36,20 @@ EVPN_ORG_TOOL_DOC = """
     1. **Organization-Level Fabrics:**
     - ?for_site=any" in API call returns fabrics in any sites within the organization with their unique topology_id
     - Span multiple sites within an organization
-    - site_specific_fabric = false is return
+    - site_only_fabric = false is return
     - Multiple fabrics per org supported but are not common
 
 
     2. **Site-Level Fabrics:**
-    - site_specific_fabric = true is return
+    - site_only_fabric = true is return
     - Contained within a single site boundary
     - Share the same switch template configuration
     - Multiple fabrics can exist within one site
     - Used for localized network segments
 
     Response Handling:
-    - site fabric when site_specific_fabric is true is return
-    - organization fabric when site_specific_fabric is false is return
+    - site fabric when site_only_fabric is true is return
+    - organization fabric when site_only_fabric is false is return
     - Returns JSON array of organization-level EVPN fabrics
     - Shows fabric names, topology types, and creation timestamps
     - Reports underlay/overlay configuration (AS numbers, subnets)
@@ -75,7 +75,7 @@ EVPN_ORG_TOOL_DOC = """
 EVPN_SITE_TOOL_DOC = """
     EVPN FABRIC TOOL #2: Site-Level EVPN Topology Manager
 
-    Function: Retrieves site-specific EVPN fabrics contained within a single site.
+    Function: Retrieves site_only_fabric EVPN fabrics contained within a single site.
             Site fabrics are smaller, localized deployments that share the same and contains side_id in the API call.
             switch template and are managed independently from organization fabrics.
             Multiple fabrics can exist within a single site.
@@ -93,7 +93,7 @@ EVPN_SITE_TOOL_DOC = """
 
     Response Handling:
     - Returns JSON array of site-specific EVPN fabrics
-    - when site_specific_fabric = true is return
+    - when site_only_fabric = true is return
     - Shows fabric names, topology IDs, and site assignments
     - Reports pod configurations within the site
     - Contains underlay/overlay settings specific to site
@@ -134,8 +134,8 @@ EVPN_DETAILS_TOOL_DOC = """
     - Examples: Campus networks, multi-building healthcare systems
 
     Function: Get detailed EVPN topology information for a site or organization and topology ID.
-    - site_specific_fabric = true is return , Site-Level Fabrics, use site_id,  /api/v1/sites/{site_id}/evpn_topologies/{topology_id}
-    - site_specific_fabric = false is return, Multi Site Fabrics, use org_id,  /api/v1/orgs/{org_id}/evpn_topologies/{topology_id}
+    - site_only_fabric = true is return , Site-Level Fabrics, use site_id,  /api/v1/sites/{site_id}/evpn_topologies/{topology_id}
+    - site_only_fabric = false is return, Multi Site Fabrics, use org_id,  /api/v1/orgs/{org_id}/evpn_topologies/{topology_id}
 
 
     Accepts either site_id or org_id (one must be provided) along with topology_id.
