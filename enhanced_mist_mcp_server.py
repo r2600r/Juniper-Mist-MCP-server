@@ -3276,7 +3276,7 @@ async def get_device_events(site_id: str, event_type: str = None, start: int = N
                 events_data = json.loads(result.get("response_data", "[]"))
                 result["events"] = events_data
                 result["event_count"] = len(events_data.get("results", []))
-                result["message"] = f"Retrieved {len(events_data.get("results", []))} events"
+                result["message"] = f'Retrieved {len(events_data.get("results", []))} events'
                         
                 site_device_events = []
                 for events in events_data.get("results", []):
