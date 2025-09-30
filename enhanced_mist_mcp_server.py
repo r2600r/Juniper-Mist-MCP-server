@@ -1260,6 +1260,7 @@ DOC_INITIALIZED = initialize_documentation()
 
 def get_tool_doc(tool_name: str) -> str:
     """Get tool documentation safely"""
+    
     if DOC_INITIALIZED and tool_name in TOOL_DOCS:
         return TOOL_DOCS[tool_name]
     
@@ -1269,7 +1270,448 @@ def get_tool_doc(tool_name: str) -> str:
     except Exception as e:
         debug_stderr(f"Failed to get documentation for {tool_name}: {e}")
         return f"Documentation for {tool_name} not available"
+
+# =============================================================================
+# ENHANCED STATISTICS HELPER FUNCTIONS
+# =============================================================================
+
+def get_stats_type_descriptions() -> Dict[str, Dict[str, str]]:
+    """
+    Get comprehensive descriptions of all available statistics types with their
+    specific use cases, data types, and recommended analysis approaches
     
+    Returns:
+        Dict containing detailed descriptions for each stats type
+    """
+    return {
+        "general": {
+            "description": "Overall organization health and performance metrics",
+            "data_includes": "Sites, devices, users, connectivity, SLE metrics",
+            "use_cases": "Executive dashboards, health monitoring, capacity planning",
+            "update_frequency": "Every 10 minutes",
+            "best_for": "High-level organizational overview and KPI tracking"
+        },
+        "assets": {
+            "description": "Asset tracking and location services statistics",
+            "data_includes": "Asset locations, tracking accuracy, battery levels, movement patterns",
+            "use_cases": "Asset management, location analytics, inventory tracking",
+            "update_frequency": "Real-time with device polling",
+            "best_for": "Physical asset management and location-based services"
+        },
+        "devices": {
+            "description": "Device health and performance across all device types",
+            "data_includes": "Device status, performance metrics, health scores, connectivity",
+            "use_cases": "Infrastructure monitoring, device troubleshooting, fleet management",
+            "update_frequency": "Every 5-10 minutes",
+            "best_for": "Network infrastructure health and device lifecycle management"
+        },
+        "mxedges": {
+            "description": "MX Edge SD-WAN and edge computing statistics",
+            "data_includes": "Tunnel status, throughput, latency, SD-WAN metrics",
+            "use_cases": "SD-WAN monitoring, edge performance, WAN optimization",
+            "update_frequency": "Every 5 minutes",
+            "best_for": "SD-WAN deployments and edge computing performance analysis"
+        },
+        "bgp_peers": {
+            "description": "BGP routing and peer performance statistics",
+            "data_includes": "BGP session states, route counts, AS path info, convergence times",
+            "use_cases": "Routing analysis, BGP troubleshooting, network topology mapping",
+            "update_frequency": "Every 1-5 minutes",
+            "best_for": "Enterprise WAN and service provider routing analysis"
+        },
+        "sites": {
+            "description": "Site-level aggregated performance statistics",
+            "data_includes": "Per-site metrics, user counts, performance scores, alerts",
+            "use_cases": "Multi-site comparisons, site performance benchmarking",
+            "update_frequency": "Every 10 minutes",
+            "best_for": "Multi-site deployments and regional performance analysis"
+        },
+        "clients": {
+            "description": "Client connection and usage statistics",
+            "data_includes": "Client sessions, authentication, throughput, experience metrics",
+            "use_cases": "User experience monitoring, capacity planning, troubleshooting",
+            "update_frequency": "Real-time to 1 minute",
+            "best_for": "End-user experience analysis and network utilization planning"
+        },
+        "tunnels": {
+            "description": "VPN and overlay tunnel performance statistics", 
+            "data_includes": "Tunnel status, throughput, latency, availability metrics",
+            "use_cases": "VPN monitoring, overlay network analysis, connectivity troubleshooting",
+            "update_frequency": "Every 1-5 minutes",
+            "best_for": "VPN deployments and overlay network performance monitoring"
+        },
+        "wireless": {
+            "description": "Wi-Fi specific RF and client experience statistics",
+            "data_includes": "RF metrics, channel utilization, client roaming, interference",
+            "use_cases": "Wi-Fi optimization, RF planning, client experience analysis",
+            "update_frequency": "Every 1-2 minutes",
+            "best_for": "Wireless network optimization and RF performance analysis"
+        },
+        "wired": {
+            "description": "Ethernet and switch port utilization statistics",
+            "data_includes": "Port utilization, link status, PoE usage, switching metrics",
+            "use_cases": "Switch monitoring, port capacity planning, wired troubleshooting",
+            "update_frequency": "Every 5 minutes", 
+            "best_for": "Wired infrastructure monitoring and capacity planning"
+        }
+    }
+
+def validate_stats_parameters(stats_type: str, **kwargs) -> Tuple[bool, List[str]]:
+    """
+    Validate parameters for specific statistics types and provide helpful error messages
+    
+    Args:
+        stats_type: The type of statistics being requested
+        **kwargs: Parameters to validate
+        
+    Returns:
+        Tuple of (is_valid, list_of_error_messages)
+    """
+    errors = []
+    valid_types = get_stats_type_descriptions().keys()
+    
+    if stats_type not in valid_types:
+        errors.append(f"Invalid stats_type '{stats_type}'. Valid options: {list(valid_types)}")
+        return False, errors
+    
+    # Validate time range parameters
+    start = kwargs.get('start')
+    end = kwargs.get('end')
+    duration = kwargs.get('duration', '1d')
+    
+    if start is not None and end is not None:
+        if start >= end:
+            errors.append("Start time must be before end time")
+        if end - start > 30 * 24 * 3600:  # More than 30 days
+            errors.append("Time range cannot exceed 30 days")
+    
+    valid_durations = ['1h', '6h', '1d', '1w', '1m']
+    if duration not in valid_durations:
+        errors.append(f"Invalid duration '{duration}'. Valid options: {valid_durations}")
+    
+    # Validate pagination parameters
+    limit = kwargs.get('limit', 100)
+    if not isinstance(limit, int) or limit < 1 or limit > 1000:
+        errors.append("Limit must be between 1 and 1000")
+    
+    page = kwargs.get('page', 1)
+    if not isinstance(page, int) or page < 1:
+        errors.append("Page must be a positive integer")
+    
+    # Validate device_type for applicable stats_types
+    device_type = kwargs.get('device_type')
+    if device_type and stats_type in ['devices', 'general']:
+        valid_device_types = ['ap', 'switch', 'gateway', 'mxedge']
+        if device_type not in valid_device_types:
+            errors.append(f"Invalid device_type '{device_type}'. Valid options: {valid_device_types}")
+    
+    return len(errors) == 0, errors
+
+def format_stats_response(stats_data: Dict, stats_type: str, params: Dict) -> Dict:
+    """
+    Format and enhance statistics response data with type-specific analysis
+    
+    Args:
+        stats_data: Raw statistics data from API
+        stats_type: Type of statistics
+        params: Original request parameters
+        
+    Returns:
+        Enhanced and formatted statistics response
+    """
+    formatted_response = {
+        "stats_type": stats_type,
+        "query_parameters": params,
+        "data_summary": {},
+        "analysis": {},
+        "raw_data": stats_data
+    }
+    
+    try:
+        if stats_type == "general":
+            formatted_response["data_summary"] = {
+                "total_sites": stats_data.get("num_sites", 0),
+                "total_devices": stats_data.get("num_devices", 0),
+                "connected_devices": stats_data.get("num_devices_connected", 0),
+                "device_connection_rate": round(
+                    (stats_data.get("num_devices_connected", 0) / 
+                     max(stats_data.get("num_devices", 1), 1)) * 100, 1
+                ),
+                "active_clients": stats_data.get("num_clients", 0)
+            }
+            
+        elif stats_type == "devices":
+            if isinstance(stats_data, list):
+                device_types = {}
+                device_status = {"connected": 0, "disconnected": 0}
+                
+                for device in stats_data:
+                    dev_type = device.get("type", "unknown")
+                    device_types[dev_type] = device_types.get(dev_type, 0) + 1
+                    
+                    if device.get("connected", False):
+                        device_status["connected"] += 1
+                    else:
+                        device_status["disconnected"] += 1
+                
+                formatted_response["data_summary"] = {
+                    "total_devices": len(stats_data),
+                    "device_types": device_types,
+                    "connectivity_status": device_status
+                }
+                
+        elif stats_type == "clients":
+            if isinstance(stats_data, list):
+                client_types = {"wireless": 0, "wired": 0}
+                auth_methods = {}
+                
+                for client in stats_data:
+                    if client.get("ap"):
+                        client_types["wireless"] += 1
+                    else:
+                        client_types["wired"] += 1
+                    
+                    auth = "authenticated" if (client.get("username") or client.get("psk_name")) else "open"
+                    auth_methods[auth] = auth_methods.get(auth, 0) + 1
+                
+                formatted_response["data_summary"] = {
+                    "total_clients": len(stats_data),
+                    "client_types": client_types,
+                    "authentication_methods": auth_methods
+                }
+        
+        # Add performance insights
+        formatted_response["performance_insights"] = generate_performance_insights(stats_data, stats_type)
+        
+    except Exception as e:
+        formatted_response["formatting_error"] = str(e)
+        formatted_response["raw_data_available"] = True
+    
+    return formatted_response
+
+def generate_performance_insights(stats_data: Dict, stats_type: str) -> List[str]:
+    """
+    Generate actionable performance insights based on statistics data
+    
+    Args:
+        stats_data: Statistics data to analyze
+        stats_type: Type of statistics
+        
+    Returns:
+        List of performance insights and recommendations
+    """
+    insights = []
+    
+    try:
+        if stats_type == "general":
+            connection_rate = (stats_data.get("num_devices_connected", 0) / 
+                             max(stats_data.get("num_devices", 1), 1)) * 100
+            
+            if connection_rate < 95:
+                insights.append(f"Device connectivity at {connection_rate:.1f}% - investigate disconnected devices")
+            elif connection_rate >= 99:
+                insights.append("Excellent device connectivity - all systems operational")
+            
+            client_count = stats_data.get("num_clients", 0)
+            device_count = stats_data.get("num_devices", 1)
+            clients_per_device = client_count / device_count if device_count > 0 else 0
+            
+            if clients_per_device > 50:
+                insights.append(f"High client density detected ({clients_per_device:.1f} clients/device) - consider capacity expansion")
+            
+        elif stats_type == "devices" and isinstance(stats_data, list):
+            if len(stats_data) == 0:
+                insights.append("No devices found - verify device deployment and connectivity")
+            else:
+                models = {}
+                for device in stats_data:
+                    model = device.get("model", "unknown")
+                    models[model] = models.get(model, 0) + 1
+                
+                if len(models) > 5:
+                    insights.append(f"Device diversity detected - {len(models)} different models in deployment")
+                
+        elif stats_type == "clients" and isinstance(stats_data, list):
+            if len(stats_data) == 0:
+                insights.append("No active clients found - verify network accessibility")
+            else:
+                avg_rssi = []
+                for client in stats_data:
+                    rssi = client.get("rssi")
+                    if rssi:
+                        avg_rssi.append(rssi)
+                
+                if avg_rssi:
+                    avg_signal = sum(avg_rssi) / len(avg_rssi)
+                    if avg_signal < -70:
+                        insights.append(f"Poor average signal strength detected ({avg_signal:.1f} dBm) - consider AP placement optimization")
+                    elif avg_signal > -50:
+                        insights.append("Excellent signal strength - optimal RF coverage")
+        
+        # Generic insights
+        if not insights:
+            insights.append(f"{stats_type.title()} statistics retrieved successfully - review detailed metrics for optimization opportunities")
+            
+    except Exception as e:
+        insights.append(f"Performance analysis incomplete due to: {str(e)}")
+    
+    return insights
+
+def get_recommended_time_ranges() -> Dict[str, Dict[str, str]]:
+    """
+    Get recommended time ranges for different statistics types and use cases
+    
+    Returns:
+        Dictionary of recommended time ranges by stats type and use case
+    """
+    return {
+        "real_time_monitoring": {
+            "duration": "1h",
+            "description": "Last hour for real-time monitoring and immediate troubleshooting",
+            "best_for": ["clients", "devices", "wireless", "tunnels"]
+        },
+        "daily_operations": {
+            "duration": "1d", 
+            "description": "Last 24 hours for daily operations and performance review",
+            "best_for": ["general", "sites", "bgp_peers", "wired"]
+        },
+        "weekly_analysis": {
+            "duration": "1w",
+            "description": "Last week for trend analysis and capacity planning",
+            "best_for": ["assets", "mxedges", "general", "sites"]
+        },
+        "monthly_reporting": {
+            "duration": "1m",
+            "description": "Last month for executive reporting and long-term trends",
+            "best_for": ["general", "sites", "devices", "clients"]
+        }
+    }
+
+# =============================================================================
+# ENHANCED ERROR HANDLING AND RECOVERY FUNCTIONS  
+# =============================================================================
+
+def handle_stats_api_error(error_response: Dict, stats_type: str, org_id: str) -> Dict:
+    """
+    Provide enhanced error handling with specific troubleshooting steps for statistics API errors
+    
+    Args:
+        error_response: Error response from API
+        stats_type: Type of statistics that failed
+        org_id: Organization ID
+        
+    Returns:
+        Enhanced error response with troubleshooting information
+    """
+    http_status = error_response.get("http_status", 0)
+    
+    troubleshooting = {
+        "stats_type": stats_type,
+        "organization_id": org_id,
+        "error_category": "unknown",
+        "immediate_actions": [],
+        "common_causes": [],
+        "next_steps": []
+    }
+    
+    if http_status == 401:
+        troubleshooting.update({
+            "error_category": "authentication",
+            "immediate_actions": [
+                "Verify API token is valid and not expired",
+                "Check API token has read permissions for organization statistics"
+            ],
+            "common_causes": [
+                "Expired or invalid API token",
+                "Insufficient permissions for statistics access",
+                "Token not associated with the organization"
+            ]
+        })
+    
+    elif http_status == 403:
+        troubleshooting.update({
+            "error_category": "authorization",
+            "immediate_actions": [
+                f"Verify API token has access to organization '{org_id}'",
+                f"Check if '{stats_type}' statistics are enabled for this organization"
+            ],
+            "common_causes": [
+                "API token lacks organization access permissions",
+                f"'{stats_type}' feature not enabled or licensed",
+                "Organization access restrictions in place"
+            ]
+        })
+    
+    elif http_status == 404:
+        troubleshooting.update({
+            "error_category": "not_found", 
+            "immediate_actions": [
+                f"Verify organization ID '{org_id}' is correct",
+                f"Check if '{stats_type}' endpoint is supported"
+            ],
+            "common_causes": [
+                "Invalid or non-existent organization ID",
+                "Statistics type not supported for this organization",
+                "API endpoint not available in current region"
+            ]
+        })
+    
+    elif http_status == 429:
+        troubleshooting.update({
+            "error_category": "rate_limit",
+            "immediate_actions": [
+                "Wait before retrying request",
+                "Implement exponential backoff in retry logic"
+            ],
+            "common_causes": [
+                "Exceeded API rate limit (5000 calls/hour)",
+                "Too many concurrent requests",
+                "Burst request pattern triggering rate limiting"
+            ]
+        })
+    
+    elif http_status >= 500:
+        troubleshooting.update({
+            "error_category": "server_error",
+            "immediate_actions": [
+                "Retry request after brief delay",
+                "Check Mist service status and announcements"
+            ],
+            "common_causes": [
+                "Temporary Mist API service issue",
+                "Internal server error processing request",
+                "Maintenance or service disruption"
+            ]
+        })
+    
+    # Add stats-type specific troubleshooting
+    if stats_type == "devices":
+        troubleshooting["next_steps"].extend([
+            "Verify devices are adopted and connected to Mist cloud",
+            "Check if devices are reporting statistics properly"
+        ])
+    elif stats_type == "bgp_peers":
+        troubleshooting["next_steps"].extend([
+            "Ensure BGP is configured and operational on network devices",
+            "Verify BGP peers are established and exchanging routes"
+        ])
+    elif stats_type == "mxedges":
+        troubleshooting["next_steps"].extend([
+            "Verify MX Edge devices are deployed and operational",
+            "Check MX Edge cloud connectivity and registration"
+        ])
+    
+    return {
+        "error": True,
+        "original_error": error_response,
+        "enhanced_troubleshooting": troubleshooting,
+        "support_information": {
+            "documentation": f"https://www.juniper.net/documentation/us/en/software/mist/api/http/api/orgs/stats/{stats_type}.html",
+            "support_contact": "Create support ticket at https://support.juniper.net for persistent issues",
+            "api_reference": "https://api.mist.com/api/v1/docs/"
+        }
+    }
+
 # =====================================================================
 # ENHANCED TOOL DEFINITION SYSTEM
 # =====================================================================
@@ -1925,32 +2367,46 @@ async def get_organizations(org_id: str) -> str:
         return json.dumps({"error": f" Error: Failed to get organizations: {str(e)}"}, indent=2)
 
 @safe_tool_definition("get_organization_stats", "organization")
-async def get_organization_stats(org_id: str, page: int = 1, limit: int = 100, 
-                               start: int = None, end: int = None, duration: str = "1d") -> str:
+async def get_organization_stats(org_id: str, stats_type: str = "general", page: int = 1, limit: int = 100, 
+                               start: int = None, end: int = None, duration: str = "1d", 
+                               device_type: str = None, site_id: str = None) -> str:
     """
-    ORGANIZATION TOOL #2: Enhanced Organization Statistics Analyzer
+    ORGANIZATION TOOL #2: Enhanced Organization Statistics Analyzer with Multiple Stats Types
     
-    Function: Retrieves comprehensive statistics and metrics for a specific
-              organization including sites, devices, users, and performance data
-              with flexible time range and pagination controls
+    Function: Retrieves comprehensive statistics and metrics for a specific organization
+              with support for multiple specialized statistics endpoints including general stats,
+              assets, devices, MX edges, and other infrastructure components with flexible 
+              time range and filtering controls
     
-    API Used: GET /api/v1/orgs/{org_id}/stats
+    API Used: Multiple Mist API endpoints based on stats_type parameter:
+    - GET /api/v1/orgs/{org_id}/stats (general organization statistics)
+    - GET /api/v1/orgs/{org_id}/stats/assets (asset tracking and management statistics)  
+    - GET /api/v1/orgs/{org_id}/stats/devices (device-specific statistics across all device types)
+    - GET /api/v1/orgs/{org_id}/stats/mxedges (MX Edge statistics for SD-WAN and edge computing)
+    - GET /api/v1/orgs/{org_id}/stats/bgp_peers (BGP peering statistics for routing analysis)
+    - GET /api/v1/orgs/{org_id}/stats/sites (site-level aggregated statistics)
+    - GET /api/v1/orgs/{org_id}/stats/clients (client connection and usage statistics)
     
     Parameters:
     - org_id (str): Organization ID to retrieve statistics for (required)
+    - stats_type (str): Type of statistics to retrieve (default: "general")
+                       Valid values: "general", "assets", "devices", "mxedges", "bgp_peers", 
+                                   "sites", "clients", "tunnels", "wireless", "wired"
     - page (int): Page number for pagination (default: 1)
     - limit (int): Maximum number of entries per page (default: 100, max: 1000)
     - start (int): Start time as Unix timestamp (optional, overrides duration)
     - end (int): End time as Unix timestamp (optional, used with start)
     - duration (str): Time period when start/end not specified (default: "1d")
                      Valid values: "1h", "1d", "1w", "1m"
+    - device_type (str): Filter by device type for device stats (ap, switch, gateway, mxedge)
+    - site_id (str): Filter by specific site ID for scoped statistics
     
     Response Handling:
-    - Returns JSON with comprehensive organization metrics and statistics
-    - Shows total sites, devices, and active users with time-series data
+    - Returns JSON with comprehensive organization metrics and statistics based on type
+    - Shows total counts, performance metrics, and time-series data for the specified type
+    - Includes specialized metrics per stats type (assets: tracking/location, devices: health/performance)
     - Reports network performance statistics over specified time range
-    - Includes client connection statistics and bandwidth utilization
-    - Contains Service Level Expectation (SLE) metrics with success rates
+    - Contains Service Level Expectation (SLE) metrics where applicable
     - Shows alarm and event summary statistics for the time period
     - Supports pagination for large datasets with next page indicators
     
@@ -1958,35 +2414,91 @@ async def get_organization_stats(org_id: str, page: int = 1, limit: int = 100,
     - If start & end provided: Uses specific timestamp range (Unix timestamps)
     - If only duration provided: Uses relative time period from now
     - Default duration: "1d" (last 24 hours)
-    - SLE data updated every 10 minutes, recommended 1-hour intervals
+    - Statistics data updated every 10 minutes, recommended 1-hour intervals for trends
     
     Enhanced Features:
+    - Multi-endpoint support for specialized statistics types
     - Flexible time range control (absolute timestamps or relative duration)
     - Pagination support for large organizations with many resources
+    - Device-type filtering for focused analysis
+    - Site-scoped statistics for multi-site organizations
     - Trend analysis compared to previous periods using time series data
     - Performance benchmarking against org baselines over time
     - Geographic distribution of resources and usage patterns
     - Health score calculation and reporting with historical context
     - Resource utilization efficiency metrics with time-based analysis
+    - Enhanced error handling and fallback mechanisms
+    
+    Stats Type Descriptions:
+    - "general": Overall organization health, sites, devices, users, performance
+    - "assets": Asset tracking, location services, asset management metrics
+    - "devices": Device health, performance, connectivity across all device types
+    - "mxedges": MX Edge specific stats for SD-WAN, tunnels, edge services
+    - "bgp_peers": BGP routing statistics, peer status, route advertisements
+    - "sites": Site-level aggregated statistics and performance metrics
+    - "clients": Wireless and wired client statistics, sessions, usage patterns
+    - "tunnels": VPN and overlay tunnel statistics, performance, availability
+    - "wireless": Wi-Fi specific statistics, RF performance, client experience
+    - "wired": Ethernet/switch statistics, port utilization, link performance
     
     Use Cases:
-    - Organization health monitoring and dashboards with time controls
+    - Comprehensive organization health monitoring with specialized focus areas
+    - Asset management and tracking analysis for location-aware deployments
+    - Device fleet management and performance optimization across device types
+    - SD-WAN and edge computing performance analysis via MX Edge stats
+    - Network routing analysis and BGP peer performance monitoring
+    - Multi-site performance comparison and benchmarking
+    - Client experience analysis across wireless and wired infrastructure
     - Capacity planning and resource allocation based on historical trends
     - Performance trend analysis and reporting over custom time ranges
-    - Executive summary and KPI reporting with specific date ranges
+    - Executive summary and KPI reporting with specific date ranges and focus
     - Multi-organization comparison and benchmarking over time periods
     - Compliance reporting with specific audit time windows
     - Historical analysis for troubleshooting performance issues
     """
     try:
-        debug_stderr(f"Executing enhanced get_organization_stats for org {org_id}...")
+        debug_stderr(f"Executing enhanced get_organization_stats for org {org_id}, type: {stats_type}...")
         client = get_api_client()
-        endpoint = f"/api/v1/orgs/{org_id}/stats"
+        
+        # Map stats_type to appropriate endpoint
+        endpoint_map = {
+            "general": f"/api/v1/orgs/{org_id}/stats",
+            "assets": f"/api/v1/orgs/{org_id}/stats/assets",
+            "devices": f"/api/v1/orgs/{org_id}/stats/devices",
+            "mxedges": f"/api/v1/orgs/{org_id}/stats/mxedges",
+            "bgp_peers": f"/api/v1/orgs/{org_id}/stats/bgp_peers",
+            "sites": f"/api/v1/orgs/{org_id}/stats/sites",
+            "clients": f"/api/v1/orgs/{org_id}/stats/clients", 
+            "tunnels": f"/api/v1/orgs/{org_id}/stats/tunnels",
+            "wireless": f"/api/v1/orgs/{org_id}/stats/wireless",
+            "wired": f"/api/v1/orgs/{org_id}/stats/wired"
+        }
+        
+        # Validate stats_type
+        if stats_type not in endpoint_map:
+            return json.dumps({
+                "error": f"Invalid stats_type '{stats_type}'. Valid types: {list(endpoint_map.keys())}",
+                "valid_stats_types": list(endpoint_map.keys()),
+                "description": {
+                    "general": "Overall organization health and performance metrics",
+                    "assets": "Asset tracking and location services statistics", 
+                    "devices": "Device health and performance across all device types",
+                    "mxedges": "MX Edge SD-WAN and edge computing statistics",
+                    "bgp_peers": "BGP routing and peer performance statistics",
+                    "sites": "Site-level aggregated performance statistics",
+                    "clients": "Client connection and usage statistics",
+                    "tunnels": "VPN and overlay tunnel performance statistics", 
+                    "wireless": "Wi-Fi specific RF and client experience statistics",
+                    "wired": "Ethernet and switch port utilization statistics"
+                }
+            }, indent=2)
+        
+        endpoint = endpoint_map[stats_type]
         
         # Build query parameters based on provided inputs
         params = {
             "page": page,
-            "limit": limit
+            "limit": min(max(1, limit), 1000)  # Enforce limits
         }
         
         # Handle time range parameters - start/end takes precedence over duration
@@ -1998,38 +2510,159 @@ async def get_organization_stats(org_id: str, page: int = 1, limit: int = 100,
             params["duration"] = duration
             debug_stderr(f"Using relative duration: {duration}")
         
+        # Add optional filtering parameters
+        if device_type and stats_type in ["devices", "general"]:
+            params["type"] = device_type
+        
+        if site_id:
+            params["site_id"] = site_id
+            
+        debug_stderr(f"Making request to endpoint: {endpoint} with params: {params}")
         result = await client.make_request(endpoint, params=params)
         
         if result.get("status") == "SUCCESS":
             try:
                 stats_data = json.loads(result.get("response_data", "{}"))
                 result["org_stats"] = stats_data
+                result["stats_type"] = stats_type
+                result["stats_endpoint"] = endpoint
                 
                 # Enhanced time range reporting
-                result["time_range"] = {
-                    "method": "absolute" if (start and end) else "relative",
+                result["query_parameters"] = {
+                    "stats_type": stats_type,
+                    "time_range_method": "absolute" if (start and end) else "relative",
                     "start_timestamp": start,
                     "end_timestamp": end,
                     "duration": duration,
                     "page": page,
-                    "limit": limit
+                    "limit": limit,
+                    "device_type_filter": device_type,
+                    "site_filter": site_id
                 }
                 
-                # Extract key metrics for summary
-                if "num_sites" in stats_data:
-                    result["metrics_summary"] = {
-                        "sites": stats_data.get("num_sites", 0),
-                        "total_devices": stats_data.get("num_devices", 0),
-                        "inventory_devices": stats_data.get("num_inventory", 0),
-                        "connected_devices": stats_data.get("num_devices_connected", 0),
-                        "disconnected_devices": stats_data.get("num_devices_disconnected", 0),
-                        "connection_rate": round(
-                            (stats_data.get("num_devices_connected", 0) / 
-                             max(stats_data.get("num_devices", 1), 1)) * 100, 1
-                        )
-                    }
+                # Stats-type specific processing and analysis
+                if stats_type == "general":
+                    # Extract key metrics for general stats summary
+                    if "num_sites" in stats_data:
+                        result["metrics_summary"] = {
+                            "sites": stats_data.get("num_sites", 0),
+                            "total_devices": stats_data.get("num_devices", 0),
+                            "inventory_devices": stats_data.get("num_inventory", 0),
+                            "connected_devices": stats_data.get("num_devices_connected", 0),
+                            "disconnected_devices": stats_data.get("num_devices_disconnected", 0),
+                            "connection_rate": round(
+                                (stats_data.get("num_devices_connected", 0) / 
+                                 max(stats_data.get("num_devices", 1), 1)) * 100, 1
+                            )
+                        }
                 
-                # SLE performance summary
+                elif stats_type == "devices":
+                    # Device-specific analysis
+                    if isinstance(stats_data, list):
+                        device_analysis = {
+                            "total_devices": len(stats_data),
+                            "by_type": {},
+                            "by_status": {"connected": 0, "disconnected": 0},
+                            "by_model": {}
+                        }
+                        
+                        for device in stats_data:
+                            # Type analysis
+                            dev_type = device.get("type", "unknown")
+                            device_analysis["by_type"][dev_type] = device_analysis["by_type"].get(dev_type, 0) + 1
+                            
+                            # Status analysis
+                            if device.get("status") == "connected":
+                                device_analysis["by_status"]["connected"] += 1
+                            else:
+                                device_analysis["by_status"]["disconnected"] += 1
+                            
+                            # Model analysis
+                            model = device.get("model", "unknown")
+                            device_analysis["by_model"][model] = device_analysis["by_model"].get(model, 0) + 1
+                        
+                        result["device_analysis"] = device_analysis
+                
+                elif stats_type == "assets":
+                    # Asset-specific analysis
+                    if isinstance(stats_data, list):
+                        asset_analysis = {
+                            "total_assets": len(stats_data),
+                            "by_type": {},
+                            "location_enabled": 0,
+                            "recently_seen": 0
+                        }
+                        
+                        for asset in stats_data:
+                            asset_type = asset.get("device_type", "unknown")
+                            asset_analysis["by_type"][asset_type] = asset_analysis["by_type"].get(asset_type, 0) + 1
+                            
+                            if asset.get("x") and asset.get("y"):
+                                asset_analysis["location_enabled"] += 1
+                            
+                            # Check if seen recently (within last hour)
+                            last_seen = asset.get("last_seen", 0)
+                            if last_seen and (time.time() - last_seen) < 3600:
+                                asset_analysis["recently_seen"] += 1
+                        
+                        result["asset_analysis"] = asset_analysis
+                
+                elif stats_type == "mxedges":
+                    # MX Edge specific analysis
+                    if isinstance(stats_data, list):
+                        mxedge_analysis = {
+                            "total_mxedges": len(stats_data),
+                            "by_status": {},
+                            "tunnel_stats": {"up": 0, "down": 0},
+                            "versions": {}
+                        }
+                        
+                        for mxedge in stats_data:
+                            status = mxedge.get("status", "unknown")
+                            mxedge_analysis["by_status"][status] = mxedge_analysis["by_status"].get(status, 0) + 1
+                            
+                            version = mxedge.get("version", "unknown")
+                            mxedge_analysis["versions"][version] = mxedge_analysis["versions"].get(version, 0) + 1
+                            
+                            # Analyze tunnel status if available
+                            tunnels = mxedge.get("tunnels", [])
+                            for tunnel in tunnels:
+                                if tunnel.get("up"):
+                                    mxedge_analysis["tunnel_stats"]["up"] += 1
+                                else:
+                                    mxedge_analysis["tunnel_stats"]["down"] += 1
+                        
+                        result["mxedge_analysis"] = mxedge_analysis
+                
+                elif stats_type == "clients":
+                    # Client-specific analysis
+                    if isinstance(stats_data, list):
+                        client_analysis = {
+                            "total_clients": len(stats_data),
+                            "by_type": {"wireless": 0, "wired": 0},
+                            "by_band": {},
+                            "authenticated": 0,
+                            "guest": 0
+                        }
+                        
+                        for client in stats_data:
+                            # Type analysis
+                            if client.get("ap"):
+                                client_analysis["by_type"]["wireless"] += 1
+                                band = client.get("band", "unknown")
+                                client_analysis["by_band"][band] = client_analysis["by_band"].get(band, 0) + 1
+                            else:
+                                client_analysis["by_type"]["wired"] += 1
+                            
+                            # Auth analysis
+                            if client.get("username") or client.get("psk_name"):
+                                client_analysis["authenticated"] += 1
+                            else:
+                                client_analysis["guest"] += 1
+                        
+                        result["client_analysis"] = client_analysis
+                
+                # SLE performance summary (applicable to most stats types)
                 sle_data = stats_data.get("sle", [])
                 if sle_data:
                     sle_summary = {}
@@ -2046,20 +2679,48 @@ async def get_organization_stats(org_id: str, page: int = 1, limit: int = 100,
                         }
                     result["sle_summary"] = sle_summary
                 
-                result["message"] = f"Retrieved organization statistics for {stats_data.get('name', org_id)} using {params}"
+                result["message"] = f"Retrieved {stats_type} statistics for organization {org_id} using {params}"
                 
-            except json.JSONDecodeError:
-                result["message"] = "Retrieved org stats but could not parse response"
+            except json.JSONDecodeError as e:
+                result["message"] = f"Retrieved {stats_type} stats but could not parse response: {str(e)}"
+                result["stats_type"] = stats_type
+                result["parse_error"] = str(e)
+        else:
+            # Handle API errors with helpful information
+            result["stats_type"] = stats_type
+            result["attempted_endpoint"] = endpoint
+            result["error_details"] = {
+                "status": result.get("status"),
+                "http_status": result.get("http_status"),
+                "message": result.get("message"),
+                "suggestions": [
+                    f"Verify organization ID '{org_id}' is correct",
+                    f"Ensure API token has access to organization statistics",
+                    f"Check if '{stats_type}' statistics are available for this organization",
+                    "Try with different time range or pagination parameters"
+                ]
+            }
         
-        debug_stderr("################# ✓ Enhanced get_organization_stats completed ################# ")
+        debug_stderr("################# ✅ Enhanced get_organization_stats completed #################")
         return json.dumps(result, indent=2)
+        
     except Exception as e:
         debug_stderr(f"Enhanced get_organization_stats failed: {e}")
-        return json.dumps({"error": f" Error: Failed to get organization stats: {str(e)}"}, indent=2)
-    
-@safe_tool_definition("search_org_bgp_stats", "organization")
-async def search_org_bgp_stats(
-    org_id: str,
+        return json.dumps({
+            "error": f"Enhanced organization stats request failed: {str(e)}",
+            "stats_type": stats_type,
+            "org_id": org_id,
+            "troubleshooting": {
+                "check_org_id": f"Verify '{org_id}' is a valid organization ID",
+                "check_permissions": "Ensure API token has read access to organization statistics",
+                "check_stats_type": f"Verify '{stats_type}' is supported",
+                "valid_stats_types": list(endpoint_map.keys()) if 'endpoint_map' in locals() else ["general", "assets", "devices", "mxedges"]
+            }
+        }, indent=2)    
+
+@safe_tool_definition("get_org_bgp_peers_enhanced", "organization")
+async def get_org_bgp_peers_enhanced(
+    org_id: str, 
     bgp_peer: str = None,
     neighbor_mac: str = None,
     site_id: str = None,
@@ -2069,87 +2730,282 @@ async def search_org_bgp_stats(
     end: int = None,
     duration: str = "1d",
     limit: int = 100,
-    page: int = 1
+    page: int = 1,
+    peer_status: str = None,
+    asn: str = None,
+    route_type: str = None,
+    discovery_mode: bool = None  # New parameter for auto-discovery
 ) -> str:
     """
-    ORGANIZATION TOOL #3: Search Organization BGP Stats
-
-     Function: THE PRIMARY TOOL for EVPN fabric BGP analysis. Efficiently retrieves
-               comprehensive BGP statistics for entire fabric in one API call, eliminating
-               the need for multiple individual device shell commands.   
-               Searches BGP statistics for an organization, filtered by peer, neighbor MAC, site, VRF, MAC, time range, and pagination.
-
-
+    ORGANIZATION TOOL #3: Enhanced BGP Peer Statistics Search and Analysis
+    
+    Function: Advanced search and analysis of BGP statistics for an organization with comprehensive 
+              filtering, peer relationship analysis, and routing performance metrics for network
+              infrastructure monitoring and troubleshooting. Now supports full discovery mode
+              when no filters are provided.
+    
     API Used: GET /api/v1/orgs/{org_id}/stats/bgp_peers/search
-
-    COMPREHENSIVE DATA PER BGP SESSION:
-    - BGP neighbor information (AS numbers, IP addresses, MAC addresses)  
-    - Session state and uptime statistics
-    - Route advertisement/reception counters (rx_routes, tx_routes)
-    - Packet-level statistics (rx_pkts, tx_pkts)
-    - VRF context and routing instance information
-    - Underlay vs overlay session classification
-    - Device identification and site mapping
-
+    
     Parameters:
     - org_id (str): Organization ID (required)
-    - bgp_peer (str): BGP peer IP or name (optional)
-    - neighbor_mac (str): Neighbor MAC address (optional)
-    - site_id (str): Site ID (optional)
-    - vrf_name (str): VRF name (optional)
-    - mac (str): Device MAC address (optional)
-    - start (int): Start time as Unix timestamp (optional)
-    - end (int): End time as Unix timestamp (optional)
-    - duration (str): Relative time period (default: "1d")
-    - limit (int): Max entries per page (default: 100, max: 1000)
-    - page (int): Page number (default: 1)
-
-    Response Handling:
-    - Returns JSON with BGP stats, summary, and query parameters.
+    - bgp_peer (str): BGP peer IP address or hostname (optional)
+    - neighbor_mac (str): Neighbor device MAC address (optional)
+    - site_id (str): Filter by specific site ID (optional)
+    - vrf_name (str): VRF (Virtual Routing and Forwarding) name filter (optional)
+    - mac (str): Local device MAC address filter (optional)
+    - start (int): Start time as Unix timestamp (optional, overrides duration)
+    - end (int): End time as Unix timestamp (optional, used with start)
+    - duration (str): Relative time period (default: "1d", options: "1h", "6h", "1d", "1w", "1m")
+    - limit (int): Maximum entries per page (default: 100, max: 1000)
+    - page (int): Page number for pagination (default: 1)
+    - peer_status (str): Filter by BGP peer status (established, idle, active, connect, opensent, openconfirm)
+    - asn (str): Filter by Autonomous System Number
+    - route_type (str): Filter by route type (ipv4, ipv6, evpn, l3vpn)
+    - discovery_mode (bool): Auto-enable when no filters provided for comprehensive discovery
+    
+    Discovery Mode Enhancement:
+    When no specific filters are provided (discovery_mode auto-enabled), function will:
+    - Return ALL BGP peers for comprehensive health overview
+    - Provide aggregate statistics and health summary
+    - Group results by peer status, ASN, and route types
+    - Calculate health scores and performance metrics
+    - Identify potential issues across the BGP infrastructure
     """
     try:
-        debug_stderr(f"Executing search_org_bgp_stats for org {org_id}...")
+        debug_stderr(f"Executing enhanced search_org_bgp_peers for org {org_id}...")
         client = get_api_client()
+        
+        # Auto-detect discovery mode when no specific filters provided
+        specific_filters = [bgp_peer, neighbor_mac, vrf_name, mac, peer_status, asn, route_type]
+        auto_discovery = discovery_mode or all(f is None for f in specific_filters)
+        
+        if auto_discovery:
+            debug_stderr("Auto-enabling discovery mode - no specific filters provided")
+        
         endpoint = f"/api/v1/orgs/{org_id}/stats/bgp_peers/search"
-
+        
+        # Build query parameters
         params = {
-            "limit": min(max(1, int(limit)), 1000),
-            "page": max(1, int(page))
+            "page": page,
+            "limit": min(max(1, limit), 1000)  # Enforce API limits
         }
-        if bgp_peer:
-            params["bgp_peer"] = bgp_peer
-        if neighbor_mac:
-            params["neighbor_mac"] = neighbor_mac
-        if site_id:
-            params["site_id"] = site_id
-        if vrf_name:
-            params["vrf_name"] = vrf_name
-        if mac:
-            params["mac"] = mac
+        
+        # Handle time range - start/end takes precedence over duration
         if start is not None and end is not None:
-            params["start"] = int(start)
-            params["end"] = int(end)
+            params["start"] = start
+            params["end"] = end
+            debug_stderr(f"Using absolute time range: {start} to {end}")
         else:
             params["duration"] = duration
-
+            debug_stderr(f"Using relative duration: {duration}")
+        
+        # Add optional filtering parameters only if provided
+        filter_params = {
+            "bgp_peer": bgp_peer,
+            "neighbor_mac": neighbor_mac,
+            "site_id": site_id,
+            "vrf_name": vrf_name,
+            "mac": mac,
+            "peer_status": peer_status,
+            "asn": asn,
+            "route_type": route_type
+        }
+        
+        # Only add non-None parameters to avoid API filtering issues
+        for key, value in filter_params.items():
+            if value is not None:
+                params[key] = value
+        
+        debug_stderr(f"Making BGP search request to: {endpoint} with params: {params}")
         result = await client.make_request(endpoint, params=params)
-
+        
         if result.get("status") == "SUCCESS":
             try:
-                bgp_stats = json.loads(result.get("response_data", "[]"))
-                result["bgp_stats"] = bgp_stats
-                result["stats_count"] = len(bgp_stats)
-                result["query_params"] = params
-                result["message"] = f"Retrieved {len(bgp_stats)} BGP stats entries"
-            except Exception as e:
-                result["message"] = f"Retrieved BGP stats but could not parse response: {e}"
-
-        debug_stderr("################# ✓ search_org_bgp_stats completed ################# ")
+                bgp_data = json.loads(result.get("response_data", "{}"))
+                
+                # Handle both list and dict response formats
+                if isinstance(bgp_data, dict) and "results" in bgp_data:
+                    bgp_peers = bgp_data["results"]
+                    total_peers = bgp_data.get("total", len(bgp_peers))
+                    has_pagination = bgp_data.get("next") is not None
+                elif isinstance(bgp_data, list):
+                    bgp_peers = bgp_data
+                    total_peers = len(bgp_peers)
+                    has_pagination = False
+                else:
+                    bgp_peers = []
+                    total_peers = 0
+                    has_pagination = False
+                
+                result["bgp_peers"] = bgp_peers
+                result["peer_count"] = len(bgp_peers)
+                result["total_peers"] = total_peers
+                result["has_more_results"] = has_pagination
+                result["discovery_mode"] = auto_discovery
+                
+                # Enhanced analysis when in discovery mode or with substantial results
+                if auto_discovery or len(bgp_peers) > 1:
+                    debug_stderr("Performing comprehensive BGP peer analysis...")
+                    
+                    # Comprehensive BGP health analysis
+                    analysis = {
+                        "peer_status_summary": {},
+                        "as_distribution": {},
+                        "route_type_distribution": {},
+                        "health_indicators": {
+                            "total_peers": len(bgp_peers),
+                            "established_peers": 0,
+                            "down_peers": 0,
+                            "idle_peers": 0,
+                            "health_score": 0
+                        },
+                        "performance_metrics": {
+                            "average_uptime": 0,
+                            "total_routes_received": 0,
+                            "peers_with_flaps": 0,
+                            "high_performing_peers": 0
+                        },
+                        "network_topology": {
+                            "unique_asns": set(),
+                            "evpn_peers": 0,
+                            "ipv4_peers": 0,
+                            "ipv6_peers": 0
+                        }
+                    }
+                    
+                    total_uptime = 0
+                    uptime_count = 0
+                    
+                    for peer in bgp_peers:
+                        # Status analysis
+                        status = peer.get("state", "unknown").lower()
+                        analysis["peer_status_summary"][status] = analysis["peer_status_summary"].get(status, 0) + 1
+                        
+                        if status == "established":
+                            analysis["health_indicators"]["established_peers"] += 1
+                        elif status in ["idle", "connect"]:
+                            analysis["health_indicators"]["down_peers"] += 1
+                        elif status == "idle":
+                            analysis["health_indicators"]["idle_peers"] += 1
+                        
+                        # ASN analysis
+                        asn = peer.get("neighbor_as", "unknown")
+                        analysis["as_distribution"][str(asn)] = analysis["as_distribution"].get(str(asn), 0) + 1
+                        analysis["network_topology"]["unique_asns"].add(str(asn))
+                        
+                        # Route type analysis
+                        route_families = peer.get("address_families", [])
+                        for family in route_families:
+                            family_name = family.get("address_family", "unknown")
+                            analysis["route_type_distribution"][family_name] = analysis["route_type_distribution"].get(family_name, 0) + 1
+                            
+                            # Topology classification
+                            if "evpn" in family_name.lower():
+                                analysis["network_topology"]["evpn_peers"] += 1
+                            elif "ipv4" in family_name.lower():
+                                analysis["network_topology"]["ipv4_peers"] += 1
+                            elif "ipv6" in family_name.lower():
+                                analysis["network_topology"]["ipv6_peers"] += 1
+                        
+                        # Performance metrics
+                        uptime = peer.get("uptime_seconds", 0)
+                        if uptime > 0:
+                            total_uptime += uptime
+                            uptime_count += 1
+                        
+                        # Routes received
+                        routes_received = peer.get("routes_received", 0)
+                        analysis["performance_metrics"]["total_routes_received"] += routes_received
+                        
+                        # Flap detection
+                        flap_count = peer.get("flap_count", 0)
+                        if flap_count > 5:  # Threshold for considering peer unstable
+                            analysis["performance_metrics"]["peers_with_flaps"] += 1
+                        
+                        # High performance indicator (established + low flaps + routes)
+                        if status == "established" and flap_count < 3 and routes_received > 0:
+                            analysis["performance_metrics"]["high_performing_peers"] += 1
+                    
+                    # Calculate derived metrics
+                    if uptime_count > 0:
+                        analysis["performance_metrics"]["average_uptime"] = round(total_uptime / uptime_count, 2)
+                    
+                    # Calculate health score (0-100)
+                    total_peers = analysis["health_indicators"]["total_peers"]
+                    if total_peers > 0:
+                        established_ratio = analysis["health_indicators"]["established_peers"] / total_peers
+                        high_performance_ratio = analysis["performance_metrics"]["high_performing_peers"] / total_peers
+                        flap_penalty = min(analysis["performance_metrics"]["peers_with_flaps"] / total_peers, 0.3)
+                        
+                        health_score = round((established_ratio * 70 + high_performance_ratio * 30 - flap_penalty * 20) * 100, 1)
+                        analysis["health_indicators"]["health_score"] = max(0, min(100, health_score))
+                    
+                    # Convert set to list for JSON serialization
+                    analysis["network_topology"]["unique_asns"] = list(analysis["network_topology"]["unique_asns"])
+                    analysis["network_topology"]["total_unique_asns"] = len(analysis["network_topology"]["unique_asns"])
+                    
+                    result["bgp_analysis"] = analysis
+                    
+                    # Health assessment summary
+                    if auto_discovery:
+                        health_score = analysis["health_indicators"]["health_score"]
+                        established_count = analysis["health_indicators"]["established_peers"]
+                        
+                        if health_score >= 90:
+                            health_status = "EXCELLENT"
+                        elif health_score >= 75:
+                            health_status = "GOOD"
+                        elif health_score >= 60:
+                            health_status = "FAIR"
+                        else:
+                            health_status = "POOR"
+                        
+                        result["health_summary"] = {
+                            "overall_status": health_status,
+                            "health_score": health_score,
+                            "quick_stats": f"{established_count}/{total_peers} peers established",
+                            "recommendation": "All BGP sessions healthy" if health_score >= 90 else "Review BGP peer configurations"
+                        }
+                
+                # Query context information
+                result["query_context"] = {
+                    "organization_id": org_id,
+                    "time_range_method": "absolute" if (start and end) else "relative",
+                    "start_timestamp": start,
+                    "end_timestamp": end,
+                    "duration": duration,
+                    "filters_applied": {k: v for k, v in filter_params.items() if v is not None},
+                    "pagination": {"page": page, "limit": limit},
+                    "discovery_mode_enabled": auto_discovery
+                }
+                
+                result["message"] = f"Retrieved {len(bgp_peers)} BGP peers" + (" (discovery mode)" if auto_discovery else " (filtered)")
+                
+            except json.JSONDecodeError as e:
+                result["message"] = f"Retrieved BGP peer data but could not parse response: {str(e)}"
+                result["parse_error"] = str(e)
+        
+        debug_stderr("################# ✅ Enhanced BGP peer search completed #################")
         return json.dumps(result, indent=2)
+        
     except Exception as e:
-        debug_stderr(f"search_org_bgp_stats failed: {e}")
-        return json.dumps({"error": f" Error: Failed to search BGP stats: {str(e)}"}, indent=2)
-
+        debug_stderr(f"Enhanced BGP peer search failed: {e}")
+        return json.dumps({
+            "error": f"BGP peer search failed: {str(e)}",
+            "org_id": org_id,
+            "troubleshooting": {
+                "check_org_id": f"Verify '{org_id}' is a valid organization ID",
+                "check_permissions": "Ensure API token has BGP statistics access",
+                "check_time_range": "Verify time range parameters are valid",
+                "check_filters": "Verify filter parameters match existing BGP peers"
+            },
+            "query_context": {
+                "filters_attempted": {k: v for k, v in locals().items() 
+                                   if k in ["bgp_peer", "neighbor_mac", "site_id", "vrf_name"] and v is not None},
+                "discovery_mode": discovery_mode or True
+            }
+        }, indent=2)
+    
 @safe_tool_definition("get_org_inventory", "organization")
 async def get_org_inventory(org_id: str, device_type: str = None) -> str:
     """
@@ -3289,7 +4145,7 @@ async def get_device_events(site_id: str, event_type: str = None, start: int = N
                 events_data = json.loads(result.get("response_data", "[]"))
                 result["events"] = events_data
                 result["event_count"] = len(events_data.get("results", []))
-                result["message"] = f"Retrieved {len(events_data.get("results", []))} events"
+                result["message"] = f'Retrieved {len(events_data.get("results", []))} events'
                         
                 site_device_events = []
                 for events in events_data.get("results", []):
@@ -4112,8 +4968,6 @@ debug_stderr("✓ All enhanced tool functions defined")
 @safe_tool_definition("get_org_evpn_topologies", "evpn")
 async def get_org_evpn_topologies(org_id: str) -> str:
     f"""
-    Organization-Level EVPN Topology Manager
-
     {get_tool_doc('get_org_evpn_topologies')}
     """
     
@@ -4139,12 +4993,12 @@ async def get_org_evpn_topologies(org_id: str) -> str:
                         "created_time": fabric.get("created_time"),
                         "version": fabric.get("version"),
                         "site_id": fabric.get("site_id"),
-                        "site_only_fabric": fabric.get("for_site"),
+                        "site_specific_fabric": fabric.get("for_site"),
                         "type": fabric.get("evpn_options", {}).get("routed_at"),
                         "border_leaf": not fabric.get("evpn_options", {}).get("core_as_border", False)
                     }
                     org_topology_summary.append(summary)
-                result["org_topology_summary"] = org_topology_summary
+                result["org_topology_summary"] = "org_topology_summary"
 
             except json.JSONDecodeError:
                 result["message"] = "Retrieved EVPN fabrics but could not parse response"
@@ -4158,8 +5012,6 @@ async def get_org_evpn_topologies(org_id: str) -> str:
 @safe_tool_definition("get_site_evpn_topologies", "evpn")
 async def get_site_evpn_topologies(site_id: str) -> str:
     f"""
-    EVPN FABRIC TOOL #2: Site-Level EVPN Topology Manager
-    
     {get_tool_doc('get_site_evpn_topologies')}
     """
     try:
@@ -4199,17 +5051,14 @@ async def get_site_evpn_topologies(site_id: str) -> str:
         return json.dumps({"error": f"Failed to get EVPN fabrics: {str(e)}"}, indent=2)
 
 @safe_tool_definition("get_evpn_topologies_details", "evpn")
-async def get_evpn_topologies_details(topology_id: str, site_id: str = None, org_id: str = None) -> str:
+async def get_evpn_topologies_details(topology_id: str, site_specific_fabric: str, site_id: str = None, org_id: str = None) -> str:
     f"""
-    CONDITIONAL INTEGRATION - Smart facts based on actual fabric characteristics
-    Get detailed EVPN topology information for a site or organization and topology ID.
-
     {get_tool_doc('get_evpn_topologies_details')}
     """
     try:
         debug_stderr(f"Executing get_site_evpn_topologies for topology {topology_id}...")
         client = get_api_client()
-        if site_id:
+        if site_id and site_specific_fabric:
             endpoint = f"/api/v1/sites/{site_id}/evpn_topologies/{topology_id}"
         elif org_id:
             endpoint = f"/api/v1/orgs/{org_id}/evpn_topologies/{topology_id}"
@@ -4507,7 +5356,7 @@ def verification_plan(topo_data: Dict[str, Any]) -> Dict[str, Any]:
         if border_switches:
             verification_plan["priority_switches"][border_switches[0]["mac"]] = {
                 "role": "border", "has_vtep": True,
-                "commands": ["show bgp summary", "show evpn database", "show evpn instance extensive", "show interfaces vtep"]
+                "commands": [ "show evpn database", "show evpn instance extensive", "show interfaces vtep"]
             }
     
     elif fabric_type in ["distribution", "core"]:  # ERB/CRB

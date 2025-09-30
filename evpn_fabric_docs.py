@@ -558,13 +558,20 @@ def get_tool_documentation(tool_name: str) -> str:
     Retrieve comprehensive documentation for specific EVPN tool
     Updated with 2024-2025 Mist campus fabric context
     """
-    docs = {
-        'get_org_evpn_topologies': EVPN_ORG_TOOL_DOC,
-        'get_site_evpn_topologies': EVPN_SITE_TOOL_DOC, 
-        'get_evpn_topologies_details': EVPN_DETAILS_TOOL_DOC,
-        'get_site_devices': SITE_DEVICES_TOOL_DOC
-    }
-    return docs.get(tool_name, "Documentation not available")
+    try:
+        docs = {
+            'get_org_evpn_topologies': EVPN_ORG_TOOL_DOC,
+            'get_site_evpn_topologies': EVPN_SITE_TOOL_DOC,
+            'get_evpn_topologies_details': EVPN_DETAILS_TOOL_DOC,
+            'get_site_devices': SITE_DEVICES_TOOL_DOC
+        }
+        doc = docs.get(tool_name)
+        if isinstance(doc, str) and doc.strip():
+            return doc
+    except Exception:
+        # Fall through to default message on any failure
+        pass
+    return f"Documentation for '{tool_name}' not available."
 
 def get_technical_fact(category: str, subcategory: str = None) -> dict:
     """
