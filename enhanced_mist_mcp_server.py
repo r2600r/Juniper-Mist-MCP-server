@@ -1,4 +1,4 @@
-#!/usr/bin/env python3
+    #!/usr/bin/env python3
 """
 Enhanced Mist Cloud MCP Server with Complete API Coverage and Security Analysis
 
@@ -2074,9 +2074,22 @@ async def search_org_bgp_stats(
     """
     ORGANIZATION TOOL #3: Search Organization BGP Stats
 
-    Function: Searches BGP statistics for an organization, filtered by peer, neighbor MAC, site, VRF, MAC, time range, and pagination.
+     Function: THE PRIMARY TOOL for EVPN fabric BGP analysis. Efficiently retrieves
+               comprehensive BGP statistics for entire fabric in one API call, eliminating
+               the need for multiple individual device shell commands.   
+               Searches BGP statistics for an organization, filtered by peer, neighbor MAC, site, VRF, MAC, time range, and pagination.
+
 
     API Used: GET /api/v1/orgs/{org_id}/stats/bgp_peers/search
+
+    COMPREHENSIVE DATA PER BGP SESSION:
+    - BGP neighbor information (AS numbers, IP addresses, MAC addresses)  
+    - Session state and uptime statistics
+    - Route advertisement/reception counters (rx_routes, tx_routes)
+    - Packet-level statistics (rx_pkts, tx_pkts)
+    - VRF context and routing instance information
+    - Underlay vs overlay session classification
+    - Device identification and site mapping
 
     Parameters:
     - org_id (str): Organization ID (required)
@@ -4458,7 +4471,11 @@ def get_mist_fabric_type_name(routing_type: str) -> str:
     return mist_mapping.get(routing_type, f"Unknown ({routing_type})")
 
 def verification_plan(topo_data: Dict[str, Any]) -> Dict[str, Any]:
-    """VTEP-aware verification plan based on fabric architecture"""
+    """VTEP-aware verification plan based on fabric architecture
+    IMPORTANT: For BGP fabric analysis, use search_org_bgp_stats() first!
+    This tool should only be used for specific device debugging after 
+    API analysis identifies issues.
+    """
     
     switches = topo_data.get("switches", [])
     evpn_options = topo_data.get("evpn_options", {})
@@ -4483,7 +4500,7 @@ def verification_plan(topo_data: Dict[str, Any]) -> Dict[str, Any]:
                 access = pod_access[0]
                 verification_plan["priority_switches"][access["mac"]] = {
                     "role": "access", "has_vtep": True,
-                    "commands": ["show evpn database", "show evpn instance extensive", "show evpn ip-prefix-database", "show interfaces vtep", "show bgp summary"]
+                    "commands": ["show evpn database", "show evpn instance extensive", "show evpn ip-prefix-database", "show interfaces vtep"]
                 }
         
         # Border switches (VTEP + external)
@@ -4502,14 +4519,14 @@ def verification_plan(topo_data: Dict[str, Any]) -> Dict[str, Any]:
         if dist_switches:
             verification_plan["priority_switches"][dist_switches[0]["mac"]] = {
                 "role": "distribution", "has_vtep": True,
-                "commands": ["show evpn database", "show interfaces vtep", "show evpn instance extensive", "show bgp summary", "show evpn ip-prefix-database"]
+                "commands": ["show evpn database", "show interfaces vtep", "show evpn instance extensive", "show evpn ip-prefix-database"]
             }
         
         # Core switches (VTEP commands)
         if core_switches:
             verification_plan["priority_switches"][core_switches[0]["mac"]] = {
                 "role": "core", "has_vtep": True, 
-                "commands": ["show evpn database", "show interfaces vtep", "show bgp summary"]
+                "commands": ["show evpn database", "show interfaces vtep"]
             }
     
     elif fabric_type == "collapsed-core":  # EVPN Multihoming
@@ -4532,8 +4549,6 @@ def get_vtep_strategy(fabric_type: str) -> str:
         "collapsed-core": "Core switches only have VTEPs (2-4 device limit)"
     }
     return vtep_strategies.get(fabric_type, "Unknown VTEP placement")
-
-
 
 
 # Clients functions
