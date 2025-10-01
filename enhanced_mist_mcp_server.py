@@ -3915,7 +3915,7 @@ async def get_site_insights(site_id: str, metric: str = None) -> str:
 async def get_device_stats(site_id: str, device_id: str = None, metric: str = None) -> str:
     """Get device statistics and performance metrics"""
     try:
-        debug_stderr(f"Executing get_device_stats for site {site_id}, device {device_id}...")
+        debug_stderr(f"################# Executing get_device_stats for site {site_id}, device {device_id}... #################")
         client = get_api_client()
         
         if device_id:
@@ -3933,7 +3933,7 @@ async def get_device_stats(site_id: str, device_id: str = None, metric: str = No
             try:
                 stats_data = json.loads(result.get("response_data", "{}"))
                 result["device_stats"] = stats_data
-                result["message"] = f"Retrieved device statistics"
+                result["message"] = f"################# ✓ Retrieved device statistics #################"
                 
                 if device_id:
                     result["device_id"] = device_id
@@ -5927,7 +5927,8 @@ def main():
         parser.add_argument('-H', '--host', default="127.0.0.1", type=str, 
                            help='Mist MCP Server host (default: 127.0.0.1)')
         parser.add_argument('-t', '--transport', default="stdio", type=str, 
-                           help='Mist MCP Server transport (stdio, streamable-http, websocket)')
+                           choices=['stdio', 'sse', 'http'],  # Fixed: removed 'websocket', added valid options
+                           help='Mist MCP Server transport (stdio, sse, http)')
         parser.add_argument('-p', '--port', default=30040, type=int, 
                            help='Mist MCP Server port (default: 30040)')
         parser.add_argument('--log-level', default="INFO", type=str,
@@ -6058,16 +6059,22 @@ def main():
         debug_stderr(f"Security Mode: {'STRICT' if security_analyzer.strict_mode else 'PERMISSIVE'}")
         debug_stderr("======================")
         
-        # Handle different transport types
+        # Handle different transport types with proper FastMCP methods
         debug_stderr(f"Starting Enhanced Comprehensive Secure MCP server with transport: {args.transport}")
         
         try:
             if args.transport == 'stdio':
                 debug_stderr("Using stdio transport...")
-                mcp.run(transport=args.transport)
+                mcp.run()  # stdio is the default, no parameters needed
+            elif args.transport == 'sse':
+                debug_stderr(f"Using SSE transport on {args.host}:{args.port}...")
+                mcp.run_sse(host=args.host, port=args.port)
+            elif args.transport == 'http':
+                debug_stderr(f"Using HTTP transport on {args.host}:{args.port}...")
+                # For HTTP transport, use run_sse which handles HTTP requests
+                mcp.run_sse(host=args.host, port=args.port)
             else:
-                debug_stderr(f"Using {args.transport} transport on {args.host}:{args.port}...")
-                mcp.run(host=args.host, port=args.port, transport=args.transport)
+                raise ValueError(f"Unsupported transport: {args.transport}")
                 
         except KeyboardInterrupt:
             debug_stderr("✓ Server interrupted by user (Ctrl+C) - shutting down gracefully")
@@ -6105,7 +6112,6 @@ def main():
         debug_stderr(f"Traceback: {traceback.format_exc()}")
         print(f"FATAL ERROR: {e}")
         sys.exit(1)
-
 if __name__ == '__main__':
     try:
         debug_stderr("=== ENHANCED COMPREHENSIVE SECURE SCRIPT EXECUTION START ===")
