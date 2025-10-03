@@ -160,66 +160,126 @@ EVPN_DETAILS_TOOL_DOC = """
 """
 
 SITE_DEVICES_TOOL_DOC = """
-    Function: Get device configurations for a site by type
-    CRITICAL DECISION TREE - READ CAREFULLY:
-    ┌─ Do you KNOW the exact device types present at this site? ─┐
-    │                                                            │
-    ├─ YES (user specified OR previously discovered)             │
-    │  └─ Use get_site_devices(site_id, device_type) directly    │
-    │                                                            │
-    └─ NO (unknown site OR user didn't specify device types)     │
-        └─ MANDATORY: Use get_org_inventory() FIRST              │
-            └─ Then call get_site_devices() for each discovered type    
+Function: Get device configurations for a site by type
+CRITICAL DECISION TREE - READ CAREFULLY:
+┌─ Do you KNOW the exact device types present at this site? ─┐
+│                                                            │
+├─ YES (user specified OR previously discovered)             │
+│  └─ Use get_site_devices(site_id, device_type) directly    │
+│                                                            │
+└─ NO (unknown site OR user didn't specify device types)     │
+    └─ MANDATORY: Use get_org_inventory() FIRST              │
+        └─ Then call get_site_devices() for each discovered type    
 
-    API: GET /api/v1/sites/{site_id}/devices
+API: GET /api/v1/sites/{site_id}/devices
+
+Parameters: site_id (required), device_type (optional, defaults to "ap")
+WARNING: Without device_type, only returns APs. For all configs, call separately for each type.
+Returns: Device configurations for specified type only
+Use: Get actual device configurations after knowing what types exist
+
+Function: Get device configurations for a site by type with gateway template integration
+API: GET /api/v1/sites/{site_id}/devices + GET /api/v1/orgs/{org_id}/gatewaytemplates
+Parameters: site_id (required), device_type (optional, defaults to "ap")
+WARNING: Without device_type, only returns APs. For all configs, call separately for each type.
+Returns: Device configurations for specified type with enhanced gateway template data
+Use: Get actual device configurations after knowing what types exist
+
+GATEWAY ENHANCED CONFIGURATION RETRIEVAL:
+When device_type="gateway" or when gateways are detected in the response:
+- Automatically retrieves organization gateway templates via get_org_templates(org_id,gatewaytemplates)
+- Matches gateway devices to their assigned gateway template using gatewaytemplate_id
+- Supplements basic gateway device config with full template configuration including:
+* Complete interface configurations
+* Routing policies and protocols (BGP, OSPF, static routes)
+* Security zones and policies
+* NAT and firewall rules
+* VPN tunnel configurations
+* WAN edge and SD-WAN policies
+* DHCP and DNS configurations
+- Provides template vs device configuration comparison for drift detection
+- Returns merged configuration showing both Mist-managed settings and template-defined config
+- Enables bulk configuration analysis without individual shell command delays
+
+TEMPLATE MATCHING LOGIC:
+- Uses gatewaytemplate_id from device configuration
+- Falls back to site-level gatewaytemplate_id if device-level not specified
+- Handles cases where gateways use organization default templates
+- Provides template inheritance hierarchy information
+
+CONFIGURATION DRIFT DETECTION:
+- Compares template-defined configuration with device-reported configuration
+- Identifies deviations between intended (template) and actual (device) state
+- Enables proactive configuration management and compliance reporting
+- Supports bulk configuration validation across gateway fleet
+
+IMPORTANT: By default (when no device_type is specified), this function ONLY returns Access Points (APs).
+EFFICIENCY: Use inventory first only when discovering unknown device types,
+For known device types, call get_site_devices directly with specific device_type
+Example: If you know site has only switches, call get_site_devices(site_id, "switch") directly 
+
+"""     
+
+
+EXECUTE_CUSTOM_SHELL_COMMAND = """
+
+Execute a custom shell command on a Junos device (with enhanced timeout handling)
+
+IMPORTANT: Use this tool ONLY when the required information is NOT available via API.
+For BGP statistics, use get_org_bgp_peers_enhanced() instead - it's much faster and 
+provides bulk data without individual device delays.
+
+Enhanced function to execute commands on devices where no API endpoints are available.
+
+EVPN FABRIC HEALTH ANALYSIS - USE CASES:
+========================================
+For comprehensive EVPN fabric health checks, use this tool to verify:
+
+1. EVPN Control Plane Status (DETAILED):
+    - show evpn instance extensive         # VNI status with detail
+    - show evpn database extensive         # MAC/IP table with timestamps
+    - show route table bgp.evpn.0          # EVPN route table
+    - show evpn l3-context                 # L3 VNI context
     
-    Parameters: site_id (required), device_type (optional, defaults to "ap")
-    WARNING: Without device_type, only returns APs. For all configs, call separately for each type.
-    Returns: Device configurations for specified type only
-    Use: Get actual device configurations after knowing what types exist
+2. BGP Session Details (when get_org_bgp_peers_enhanced insufficient):
+    - show bgp summary                     # Quick peer overview
+    - show bgp neighbor <ip> extensive     # Detailed peer info
+    - show route receive-protocol bgp <neighbor>
+    - show route advertising-protocol bgp <neighbor>
     
-    Function: Get device configurations for a site by type with gateway template integration
-    API: GET /api/v1/sites/{site_id}/devices + GET /api/v1/orgs/{org_id}/gatewaytemplates
-    Parameters: site_id (required), device_type (optional, defaults to "ap")
-    WARNING: Without device_type, only returns APs. For all configs, call separately for each type.
-    Returns: Device configurations for specified type with enhanced gateway template data
-    Use: Get actual device configurations after knowing what types exist
+3. VXLAN Data Plane Verification:
+    - show interfaces vtep extensive       # VTEP details
+    - show pfe vxlan nh-usage              # Nexthop usage (EX4400/QFX)
+    - show evpn instance extensive         # EVPN instance details
+    
+4. Underlay Health (IPv4 or IPv6 based fabrics):
+    - show route table inet6.0            # IPv6 underlay routes
+    - show route table inet.0             # IPv4 underlay routes
+    - show bfd session extensive          # BFD state with detail
+    - show interfaces terse | match "up|down"  # Interface status
+    
+5. MAC Learning and Troubleshooting:
+    - show ethernet-switching table       # Local MAC table (includes GBP)
+    - show ethernet-switching mac-learning-log  # MAC learn events
+    - show evpn arp-table                 # EVPN ARP entries
 
-    GATEWAY ENHANCED CONFIGURATION RETRIEVAL:
-    When device_type="gateway" or when gateways are detected in the response:
-    - Automatically retrieves organization gateway templates via get_org_templates(org_id,gatewaytemplates)
-    - Matches gateway devices to their assigned gateway template using gatewaytemplate_id
-    - Supplements basic gateway device config with full template configuration including:
-    * Complete interface configurations
-    * Routing policies and protocols (BGP, OSPF, static routes)
-    * Security zones and policies
-    * NAT and firewall rules
-    * VPN tunnel configurations
-    * WAN edge and SD-WAN policies
-    * DHCP and DNS configurations
-    - Provides template vs device configuration comparison for drift detection
-    - Returns merged configuration showing both Mist-managed settings and template-defined config
-    - Enables bulk configuration analysis without individual shell command delays
+6. System route capacity utilization
+    - show pfe route summary hw         # Hadware capacity of Packefe Forwarding Engine (PFE )
 
-    TEMPLATE MATCHING LOGIC:
-    - Uses gatewaytemplate_id from device configuration
-    - Falls back to site-level gatewaytemplate_id if device-level not specified
-    - Handles cases where gateways use organization default templates
-    - Provides template inheritance hierarchy information
 
-    CONFIGURATION DRIFT DETECTION:
-    - Compares template-defined configuration with device-reported configuration
-    - Identifies deviations between intended (template) and actual (device) state
-    - Enables proactive configuration management and compliance reporting
-    - Supports bulk configuration validation across gateway fleet
+DO NOT USE for BGP peer status - use get_org_bgp_peers_enhanced() instead.
 
-    IMPORTANT: By default (when no device_type is specified), this function ONLY returns Access Points (APs).
-    EFFICIENCY: Use inventory first only when discovering unknown device types,
-    For known device types, call get_site_devices directly with specific device_type
-    Example: If you know site has only switches, call get_site_devices(site_id, "switch") directly 
+API Used: POST /api/v1/sites/{site_id}/devices/{device_id}/shell/execute
 
+Parameters:
+    site_id: Site identifier
+    device_id: Device identifier  
+    command: Shell command to execute
+    timeout: Command timeout in seconds (5-300, default: 30)
+
+Returns:
+    JSON with command output, execution time, and status
 """
-
 
 # =============================================================================
 # CRITICAL TECHNICAL FACTS FROM JUNIPER DOCUMENTATION
@@ -247,9 +307,9 @@ EVPN_TECHNICAL_FACTS = {
             "Enhanced OISM support for optimized multicast with Type 5 routes, require MAC VRF instance",
         ],
         "mist_automation": [
-            "Automatic Type-2/Type-5 coexistence in fabric version ≥3",
+            "Automatic Type-2/Type-5 coexistence if fabric_version is higher than 3",
             "Auto-generated evpn_export_type5 policy for host/direct routes",
-            "Integrated with Enhanced OISM for multicast optimization",
+            "Enhanced OISM for multicast optimization avaliable via additional_cli n configuration, requires MAC VRF. MIST auto-configures MAC VRF only for ipv6 underlay",
             "Seamless scaling for QFX5120, EX4400, EX4100 platforms"
         ]
     },
@@ -264,7 +324,9 @@ EVPN_TECHNICAL_FACTS = {
                 "BFD enabled with 1000ms intervals for fast convergence",
                 "ECMP load balancing across equal-cost paths",
                 "Point-to-point /31 addressing between layers",
-                "Support for 2-byte or 4-byte AS numbers"
+                "Support for 2-byte or 4-byte AS numbers",
+                "MAC VRF instance configured automaticaly for IPv6 underlay"
+                "IPv4 underaly uses default switch VRF"
             ]
         },
         "overlay_peering": {
@@ -291,7 +353,7 @@ EVPN_TECHNICAL_FACTS = {
             "vtep_location": "Access/Leaf devices and Core (if no Service Block)",
             "irb_interfaces": "Access/Leaf devices",
             "best_for": "East-west traffic optimization, microsegmentation with GBP, maximum scale",
-            "co-existance": "Automatic Type-2/Type-5 coexistence (fabric version ≥3)",
+            "co-existance": "Automatic Type-2/Type-5 coexistence (fabric_version is higher than 3)",
             "mist_name": "IP-CLOS",
             "characteristics": [
                 "Optimal east-west traffic patterns",
@@ -306,7 +368,7 @@ EVPN_TECHNICAL_FACTS = {
             "vtep_location": "Distribution devices and Core/Service Block",
             "irb_interfaces": "Distribution devices",
             "best_for": "East-west traffic, distributed gateway, access layer stability",
-            "co-existance": "Automatic Type-2/Type-5 coexistence (fabric version ≥3)",
+            "co-existance": "Automatic Type-2/Type-5 coexistence (fabric_version is higher than 3)",
             "mist_name": "Core-Distribution ERB",
             "characteristics": [
                 "Access switches remain Layer 2 only (no BGP/EVPN needed)",
@@ -333,7 +395,7 @@ EVPN_TECHNICAL_FACTS = {
             "vtep_location": "Core devices only",
             "irb_interfaces": "Core devices only",
             "best_for": "Small to medium deployments, simplified operations",
-            "co-existance": "Automatic Type-2/Type-5 coexistence (fabric version ≥5)",
+            "co-existance": "Automatic Type-2/Type-5 coexistence (fabric_version is higher than 5)",
             "mist_name": "EVPN Multihoming",
             "characteristics": [
                 "Maximum 4 core devices supported",
@@ -413,7 +475,7 @@ EVPN_TECHNICAL_FACTS = {
             "optimization_strategy": [
                 "Filter devices by type=switch before EVPN analysis",
                 "Check device models for EVPN capability",
-                "Target spine/leaf devices with VTEP functionality",
+                "Target Border/access devices with VTEP functionality",
                 "Skip non-EVPN access devices for BGP analysis"
             ],         
             "switch_model_indicators": {
@@ -425,7 +487,7 @@ EVPN_TECHNICAL_FACTS = {
         "mac_vrf_scaling": {
             "issue": "VTEP scaling with multiple MAC-VRF instances",
             "solutions": [
-                "Enable Type-2/Type-5 coexistence (automatic in fabric v≥3)",
+                "Enable Type-2/Type-5 coexistence (fabric_version is higher than 53)",
                 "Configure shared tunnels on QFX5000/EX4400 series",
                 "Optimize MAC learning with EVPN control plane",
                 "configure set forwarding-options evpn-vxlan shared-tunnels",
@@ -563,7 +625,8 @@ def get_tool_documentation(tool_name: str) -> str:
             'get_org_evpn_topologies': EVPN_ORG_TOOL_DOC,
             'get_site_evpn_topologies': EVPN_SITE_TOOL_DOC,
             'get_evpn_topologies_details': EVPN_DETAILS_TOOL_DOC,
-            'get_site_devices': SITE_DEVICES_TOOL_DOC
+            'get_site_devices': SITE_DEVICES_TOOL_DOC,
+            'execute_custom_shell_command': EXECUTE_CUSTOM_SHELL_COMMAND
         }
         doc = docs.get(tool_name)
         if isinstance(doc, str) and doc.strip():

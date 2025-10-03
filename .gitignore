@@ -1,3 +1,4 @@
 .env
 lib/
 lib/*
+__pycache__/evpn_fabric_docs.cpython-313.pyc

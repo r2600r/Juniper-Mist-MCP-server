@@ -19,6 +19,7 @@ Author: Enhanced by Claude for Complete Mist API Coverage with Security Controls
 Date: August 2025
 """
 
+import uvicorn
 import argparse
 import logging
 import os
@@ -27,6 +28,11 @@ import sys
 import re
 import time
 import asyncio
+from typing import AsyncIterator
+from starlette.applications import Starlette
+from starlette.responses import StreamingResponse, JSONResponse
+from starlette.routing import Route
+from starlette.middleware.cors import CORSMiddleware
 from datetime import datetime, timedelta
 from collections import defaultdict, deque
 from dataclasses import dataclass, asdict
@@ -969,7 +975,7 @@ class JunosShellExecutor:
             )
             
             self.active_connections.add(websocket_conn)
-            debug_stderr(f"WebSocket connection established for command: {command}")
+            debug_stderr(f" => => => WebSocket connection established for command: {command}")
             
             # Send command
             await asyncio.sleep(1)  # Allow connection to stabilize
@@ -2186,7 +2192,6 @@ async def get_user_info() -> str:
                 result["privilege_analysis"] = privilege_analysis
                 
                 # Legacy compatibility fields
-                result["privileges_count"] = len(privileges)
                 result["tags"] = user_data.get("tags", [])
                 
                 # Enhanced summary statistics
@@ -2269,18 +2274,34 @@ async def get_audit_logs(org_id: str = None, site_id: str = None, limit: int = 1
         
         if result.get("status") == "SUCCESS":
             try:
-                logs_data = json.loads(result.get("response_data", "[]"))
-                result["logs"] = logs_data
-                result["log_count"] = len(logs_data)
-                result["message"] = f"Retrieved {len(logs_data)} audit log entries"
+                # FIXED: Handle dict response format from API
+                logs_response = json.loads(result.get("response_data", "{}"))
+                
+                # Handle both formats: {"results": [...]} or [...]
+                if isinstance(logs_response, dict):
+                    logs_list = logs_response.get("results", [])
+                    result["logs"] = logs_list
+                    result["log_count"] = len(logs_list)
+                    result["total_available"] = logs_response.get("total", len(logs_list))
+                    result["time_range"] = {
+                        "start": logs_response.get("start"),
+                        "end": logs_response.get("end")
+                    }
+                    result["message"] = f"Retrieved {len(logs_list)} audit log entries (total available: {result['total_available']})"
+                else:
+                    # Fallback for array format
+                    result["logs"] = logs_response
+                    result["log_count"] = len(logs_response)
+                    result["message"] = f"Retrieved {len(logs_response)} audit log entries"
+                    
             except json.JSONDecodeError:
                 result["message"] = "Retrieved logs but could not parse response"
         
-        debug_stderr("✓ get_audit_logs completed")
+        debug_stderr("################# ✓ get_audit_logs completed ################# ")
         return json.dumps(result, indent=2)
     except Exception as e:
         debug_stderr(f"get_audit_logs failed: {e}")
-        return json.dumps({"error": f" Error: Failed to get audit logs: {str(e)}"}, indent=2)
+        return json.dumps({"error": f"❌ Error: Failed to get audit logs: {str(e)}"}, indent=2)
 
 # ORGANIZATION MANAGEMENT FUNCTIONS
 
@@ -2297,22 +2318,20 @@ async def get_audit_logs(org_id: str = None, site_id: str = None, limit: int = 1
 # - count_org_nac_clients: NAC client count
 
 
-@safe_tool_definition("get_organizations", "organization")
-async def get_organizations(org_id: str) -> str:
+@safe_tool_definition("get_organization", "organization")
+async def get_organization(org_id: str) -> str:
     """
-    ORGANIZATION TOOL #1: Organization Lister
+    ORGANIZATION TOOL #1: Organization Details
     
-    Function: Retrieves list of all organizations accessible to current user
+    Function: Retrieves list of all organization settings accessible to current user
               with detailed information and access summary
     
-    API Used: GET /api/v1/orgs
+    API Used: GET /api/v1/orgs/org/{org_id}/setting
     
     Response Handling:
-    - Returns JSON array of organizations with complete details
+    - Returns JSON of basic organization details
     - Shows organization names, IDs, and creation timestamps
-    - Includes timezone and country code information
     - Reports session expiry settings per organization
-    - Contains organization-specific configuration settings
     - Shows modification timestamps for tracking changes
     
     Enhanced Features:
@@ -2323,8 +2342,8 @@ async def get_organizations(org_id: str) -> str:
     - Organization health status
     
     Use Cases:
-    - List available organizations for user selection
-    - Organization discovery and inventory
+    - List available organization data
+    - For Organization discovery need to use get_msp_orgs or get_user_info
     - Multi-tenant application organization switching
     - Access audit and permission verification
     - Organization-level reporting and analysis
@@ -2728,7 +2747,7 @@ async def get_org_bgp_peers_enhanced(
     mac: str = None,
     start: int = None,
     end: int = None,
-    duration: str = "1d",
+    duration: str = "6h",
     limit: int = 100,
     page: int = 1,
     peer_status: str = None,
@@ -2737,39 +2756,115 @@ async def get_org_bgp_peers_enhanced(
     discovery_mode: bool = None  # New parameter for auto-discovery
 ) -> str:
     """
-    ORGANIZATION TOOL #3: Enhanced BGP Peer Statistics Search and Analysis
+    CRITICAL TOOL FOR EVPN FABRIC HEALTH ANALYSIS
+    ==============================================
     
-    Function: Advanced search and analysis of BGP statistics for an organization with comprehensive 
-              filtering, peer relationship analysis, and routing performance metrics for network
-              infrastructure monitoring and troubleshooting. Now supports full discovery mode
-              when no filters are provided.
+    Function: Retrieve and analyze BGP peer statistics across the entire organization.
+    This is the PRIMARY tool for validating BGP state on any device or EVPN fabric control plane health.
+    
+    EVPN FABRIC HEALTH WORKFLOW - ALWAYS USE THIS TOOL:
+    ========================================================
+    When analyzing EVPN fabric health , this tool should be called IMMEDIATELY after 
+    topology validation and alarm checking to verify:
+    
+    1. BGP Session States: Are all underlay/overlay peers Established?
+    3. Peer Stability: Check for session flaps or high flap counts
+    4. Route Counts: Verify expected route counts per peer
+    5. Performance: Check uptime and convergence metrics
+    
+    EVPN FABRIC HEALTH CHECK - RECOMMENDED USAGE:
+    ==============================================
+    
+    Step 1 - Discovery Mode (Get ALL BGP peers):
+        get_org_bgp_peers_enhanced(
+            org_id="xxx",
+            discovery_mode=True  # or omit all filters
+        )
+        → Returns comprehensive BGP health with automatic analysis
+        → Identifies issues
+        → Groups by status, ASN, route types
+    
+    Step 2 - Troubleshoot Specific Issues (if Step 1 shows problems):
+        # Check peers in non-Established state
+        get_org_bgp_peers_enhanced(
+            org_id="xxx",
+            peer_status="idle"  # or "active", "connect"
+        )
+        
+        # Check specific site's BGP peers
+        get_org_bgp_peers_enhanced(
+            org_id="xxx",
+            site_id="yyy"
+        )
+        
+        # Check EVPN overlay peers
+        get_org_bgp_peers_enhanced(
+            org_id="xxx",
+            route_type="evpn"
+        )
+    
+    Step 3 - Detailed EVPN Validation (use shell commands AFTER BGP check):
+        Only use execute_custom_shell_command() for:
+        - show evpn database (MAC/IP learning)
+        - show evpn instance (VNI status)
+        - show interfaces vtep (VTEP health)
+        - show evpn ip-prefix-database (Type 5 routes)
+    
+    WHY THIS TOOL IS SUPERIOR TO SHELL COMMANDS FOR BGP:
+    ====================================================
+    ✓ Single API call retrieves ALL BGP peers across entire fabric
+    ✓ Automatic health analysis and scoring
+    ✓ No per-device delay (shell commands take ~5-10 seconds EACH)
+    ✓ Structured JSON response vs parsing CLI output
+    ✓ Built-in filtering, pagination, and time-range support
+    ✓ Historical data available (duration: 1h, 1d, 1w, 1m)
     
     API Used: GET /api/v1/orgs/{org_id}/stats/bgp_peers/search
     
     Parameters:
-    - org_id (str): Organization ID (required)
-    - bgp_peer (str): BGP peer IP address or hostname (optional)
-    - neighbor_mac (str): Neighbor device MAC address (optional)
-    - site_id (str): Filter by specific site ID (optional)
-    - vrf_name (str): VRF (Virtual Routing and Forwarding) name filter (optional)
-    - mac (str): Local device MAC address filter (optional)
-    - start (int): Start time as Unix timestamp (optional, overrides duration)
-    - end (int): End time as Unix timestamp (optional, used with start)
-    - duration (str): Relative time period (default: "1d", options: "1h", "6h", "1d", "1w", "1m")
-    - limit (int): Maximum entries per page (default: 100, max: 1000)
-    - page (int): Page number for pagination (default: 1)
-    - peer_status (str): Filter by BGP peer status (established, idle, active, connect, opensent, openconfirm)
-    - asn (str): Filter by Autonomous System Number
-    - route_type (str): Filter by route type (ipv4, ipv6, evpn, l3vpn)
-    - discovery_mode (bool): Auto-enable when no filters provided for comprehensive discovery
+        org_id (str): Organization ID (REQUIRED)
+        bgp_peer (str): BGP peer IP address or hostname filter
+        neighbor_mac (str): Neighbor device MAC address filter
+        site_id (str): Filter by specific site
+        vrf_name (str): VRF name filter
+        mac (str): Local device MAC address filter
+        start (int): Start time as Unix timestamp (overrides duration)
+        end (int): End time as Unix timestamp (used with start)
+        duration (str): Time period - "1h", "6h", "1d", "1w", "1m" (default: "6h")
+        limit (int): Max entries per page (default: 100, max: 1000)
+        page (int): Page number for pagination (default: 1)
+        peer_status (str): Filter by BGP state (established, idle, active, connect, opensent, openconfirm)
+        asn (str): Filter by Autonomous System Number
+        route_type (str): Filter by route type (ipv4, ipv6, evpn, l3vpn)
+        discovery_mode (bool): Auto-enabled when no filters provided
     
-    Discovery Mode Enhancement:
-    When no specific filters are provided (discovery_mode auto-enabled), function will:
-    - Return ALL BGP peers for comprehensive health overview
-    - Provide aggregate statistics and health summary
-    - Group results by peer status, ASN, and route types
-    - Calculate health scores and performance metrics
-    - Identify potential issues across the BGP infrastructure
+    Discovery Mode (Auto-enabled when no filters):
+        When discovery_mode=True or no filters provided:
+        - Returns ALL BGP peers for comprehensive health overview
+        - Provides aggregate statistics and health summary
+        - Groups results by peer status, ASN, and route types
+        - Calculates overall health score (0-100)
+        - Identifies potential issues automatically
+        - Shows peer distribution and performance metrics
+    
+    Returns:
+        JSON with:
+        - bgp_peers: Array of BGP peer objects with detailed metrics
+        - bgp_analysis: Comprehensive health analysis (in discovery mode)
+        - health_summary: Overall status and health score
+        - peer_status_summary: Count by state (established/idle/down)
+        - as_distribution: Peers grouped by ASN
+        - route_type_distribution: Peers by address family
+        - performance_metrics: Uptime, routes, flaps, health indicators
+        - network_topology: Unique ASNs, EVPN/IPv4/IPv6 peer counts
+       
+    Example Workflow for EVPN Fabric Health Check:
+        1. Get user info and topology → identify org_id, site_id
+        2. Check alarms → get_alarms()
+        3. CHECK BGP HEALTH → get_org_bgp_peers_enhanced(org_id, discovery_mode=True)
+        4. IF health_score < 90 → investigate specific issues with filters
+        5. THEN use shell commands for EVPN-specific details (database, VTEPs)
+        6. Analyze events for historical patterns
     """
     try:
         debug_stderr(f"Executing enhanced search_org_bgp_peers for org {org_id}...")
@@ -3232,6 +3327,7 @@ async def get_org_settings(org_id: str) -> str:
     - Setting change history and audit trail support
     - Configuration drift detection compared to best practices
     - Automated security hardening recommendations
+    - junos_shell_access is webhooks privilege per role     
     
     Use Cases:
     - Organization security audit and compliance validation
@@ -3594,66 +3690,9 @@ async def get_site_info(site_id: str) -> str:
 
 @safe_tool_definition("get_site_devices", "site")
 async def get_site_devices(site_id: str, device_type: str = None) -> str:
+    f"""
+    {get_tool_doc('get_site_devices')}
     """
-    Function: Get device configurations for a site by type
-    CRITICAL DECISION TREE - READ CAREFULLY:
-    ┌─ Do you KNOW the exact device types present at this site? ─┐
-    │                                                            │
-    ├─ YES (user specified OR previously discovered)             │
-    │  └─ Use get_site_devices(site_id, device_type) directly    │
-    │                                                            │
-    └─ NO (unknown site OR user didn't specify device types)     │
-        └─ MANDATORY: Use get_org_inventory() FIRST              │
-            └─ Then call get_site_devices() for each discovered type    
-
-    API: GET /api/v1/sites/{site_id}/devices
-    
-    Parameters: site_id (required), device_type (optional, defaults to "ap")
-    WARNING: Without device_type, only returns APs. For all configs, call separately for each type.
-    Returns: Device configurations for specified type only
-    Use: Get actual device configurations after knowing what types exist
-    
-    Function: Get device configurations for a site by type with gateway template integration
-    API: GET /api/v1/sites/{site_id}/devices + GET /api/v1/orgs/{org_id}/gatewaytemplates
-    Parameters: site_id (required), device_type (optional, defaults to "ap")
-    WARNING: Without device_type, only returns APs. For all configs, call separately for each type.
-    Returns: Device configurations for specified type with enhanced gateway template data
-    Use: Get actual device configurations after knowing what types exist
-
-    GATEWAY ENHANCED CONFIGURATION RETRIEVAL:
-    When device_type="gateway" or when gateways are detected in the response:
-    - Automatically retrieves organization gateway templates via get_org_templates(org_id,gatewaytemplates)
-    - Matches gateway devices to their assigned gateway template using gatewaytemplate_id
-    - Supplements basic gateway device config with full template configuration including:
-    * Complete interface configurations
-    * Routing policies and protocols (BGP, OSPF, static routes)
-    * Security zones and policies
-    * NAT and firewall rules
-    * VPN tunnel configurations
-    * WAN edge and SD-WAN policies
-    * DHCP and DNS configurations
-    - Provides template vs device configuration comparison for drift detection
-    - Returns merged configuration showing both Mist-managed settings and template-defined config
-    - Enables bulk configuration analysis without individual shell command delays
-
-    TEMPLATE MATCHING LOGIC:
-    - Uses gatewaytemplate_id from device configuration
-    - Falls back to site-level gatewaytemplate_id if device-level not specified
-    - Handles cases where gateways use organization default templates
-    - Provides template inheritance hierarchy information
-
-    CONFIGURATION DRIFT DETECTION:
-    - Compares template-defined configuration with device-reported configuration
-    - Identifies deviations between intended (template) and actual (device) state
-    - Enables proactive configuration management and compliance reporting
-    - Supports bulk configuration validation across gateway fleet
-
-    IMPORTANT: By default (when no device_type is specified), this function ONLY returns Access Points (APs).
-    EFFICIENCY: Use inventory first only when discovering unknown device types,
-    For known device types, call get_site_devices directly with specific device_type
-    Example: If you know site has only switches, call get_site_devices(site_id, "switch") directly 
-    
-    """     
     #doc = get_tool_doc('get_site_devices')
     #debug_stderr(f"Tool documentation: {doc[:1000]}...")
     try:
@@ -3980,34 +4019,8 @@ async def device_action(site_id: str, device_id: str, action: str, action_params
 # ADVANCED SHELL COMMAND FUNCTIONS
 @safe_tool_definition("execute_custom_shell_command", "device")
 async def execute_custom_shell_command(site_id: str, device_id: str, command: str, timeout: int = 30) -> str:
-    
-    """
-    Execute a custom shell command on a Junos device (with enhanced timeout handling)
-    Enhanced function to execute command on device for which there are no API endpoints available.
-    Commonly used commands include:
-    1. Used to get ehnhanced routing information for bgp or ospf
-    2. to get show interfaces terse to provide interface status and ip information
-    3. to get show configuration to provide configuration to comapre with intended state
-    4. to get show system alarms to provide current active alarms on the device
-    5. to get show log messages to provide recent log messages for troubleshooting
-    6. show pfe vxlan nh-usage on EX4400,EX4100, QFX5120,QFX5300 to shhow vxlan nexthop usage
-    7. show pfe statistics fpc 0 to show packet forwarding engine statistics
-    8. show system processes extensive to show cpu and memory usage on the device
-    9. show system storage to show storage usage on the device
-    10. show chassis hardware to show hardware inventory on the device
-    11. show interfaces diagnostics optics to show optics information on the device
-    12. show system users to show logged in users on the device
-    13. show configuration | display set to show configuration in set format
-    14. show configuration | display xml to show configuration in xml format
-    15. show configuration | display json to show configuration in json format
-    16. show log messages | match <string> to filter log messages containing specific string
-    17. show ethernet-switching table to show mac address table on switch and group based policy tags (GBP)
-    18. show lldp neighbors to show lldp neighbor information
-    19. show lacp interfaces to show lacp interface information
-    
-
-    API Used: POST /api/v1/sites/{site_id}/devices/{device_id}/shell/execute
-    
+    f"""
+    {get_tool_doc('execute_custom_shell_command')}
     """
     debug_stderr(f"Executing enhanced shell command: {command}")
     
@@ -4050,7 +4063,12 @@ async def execute_custom_shell_command(site_id: str, device_id: str, command: st
 
 @safe_tool_definition("get_enhanced_device_info", "device")
 async def get_enhanced_device_info(site_id: str, device_id: str, include_shell_data: bool = False) -> str:
-    """Get comprehensive device information, optionally including shell-based data"""
+    """
+    Get comprehensive device configuration, optionally including shell-based data
+    device_id format must be full MAC address,  e.g. "bc0ffe15c700" prepended by"00000000-0000-0000-1000-"
+    Example: "00000000-0000-0000-1000-bc0ffe15c700
+
+    """
     try:
         debug_stderr(f"Getting enhanced device info for {device_id}")
         client = get_api_client()
@@ -5920,17 +5938,14 @@ def main():
         debug_stderr("=== ENHANCED COMPREHENSIVE MAIN FUNCTION START ===")
         
         parser = argparse.ArgumentParser(
-            description="Enhanced Comprehensive Secure Mist MCP Server with Complete API Coverage",
-            epilog="This server provides comprehensive access to all Mist Cloud API endpoints with enhanced monitoring, diagnostics, and security analysis."
+            description="Enhanced Comprehensive Secure Mist MCP Server"
         )
-        
-        parser.add_argument('-H', '--host', default="127.0.0.1", type=str, 
-                           help='Mist MCP Server host (default: 127.0.0.1)')
+        parser.add_argument('-H', '--host', default="127.0.0.1", type=str)
         parser.add_argument('-t', '--transport', default="stdio", type=str, 
-                           choices=['stdio', 'sse', 'http'],  # Fixed: removed 'websocket', added valid options
-                           help='Mist MCP Server transport (stdio, sse, http)')
-        parser.add_argument('-p', '--port', default=30040, type=int, 
-                           help='Mist MCP Server port (default: 30040)')
+                           choices=['stdio', 'sse', 'http'])
+        parser.add_argument('-p', '--port', default=30040, type=int)
+        parser.add_argument('--ssl-cert', type=str, help='SSL certificate file for HTTPS')
+        parser.add_argument('--ssl-key', type=str, help='SSL key file for HTTPS')        
         parser.add_argument('--log-level', default="INFO", type=str,
                            choices=['DEBUG', 'INFO', 'WARNING', 'ERROR', 'CRITICAL'],
                            help='Set logging level (default: INFO)')
@@ -6058,21 +6073,17 @@ def main():
         debug_stderr(f"Max Concurrent: {CONFIG.max_concurrent_requests}")
         debug_stderr(f"Security Mode: {'STRICT' if security_analyzer.strict_mode else 'PERMISSIVE'}")
         debug_stderr("======================")
-        
+
         # Handle different transport types with proper FastMCP methods
         debug_stderr(f"Starting Enhanced Comprehensive Secure MCP server with transport: {args.transport}")
         
         try:
             if args.transport == 'stdio':
-                debug_stderr("Using stdio transport...")
-                mcp.run()  # stdio is the default, no parameters needed
-            elif args.transport == 'sse':
-                debug_stderr(f"Using SSE transport on {args.host}:{args.port}...")
-                mcp.run_sse(host=args.host, port=args.port)
-            elif args.transport == 'http':
-                debug_stderr(f"Using HTTP transport on {args.host}:{args.port}...")
-                # For HTTP transport, use run_sse which handles HTTP requests
-                mcp.run_sse(host=args.host, port=args.port)
+                debug_stderr("Starting stdio transport...")
+                mcp.run()
+            elif args.transport in ['sse', 'http']:
+                debug_stderr(f"Starting {args.transport.upper()} server on {args.host}:{args.port}")
+                run_web_server(args.host, args.port, args.transport, args.ssl_cert, args.ssl_key)
             else:
                 raise ValueError(f"Unsupported transport: {args.transport}")
                 
@@ -6084,8 +6095,9 @@ def main():
             print(f"FATAL ERROR: Server startup failed: {e}")
             raise
         finally:
-            # Enhanced cleanup with diagnostics and security logging
+            # cleanup with diagnostics and security logging
             debug_stderr("=== ENHANCED CLEANUP PHASE ===")
+            import asyncio
             
             # Save final diagnostics
             try:
@@ -6112,6 +6124,155 @@ def main():
         debug_stderr(f"Traceback: {traceback.format_exc()}")
         print(f"FATAL ERROR: {e}")
         sys.exit(1)
+
+def run_web_server(host: str, port: int, transport: str, ssl_cert: str = None, ssl_key: str = None):
+    """Run SSE or HTTP server with optional SSL"""
+    
+    async def sse_handler(request):
+        """Server-Sent Events endpoint"""
+        async def event_stream() -> AsyncIterator[str]:
+            try:
+                # Send initial connection event
+                yield f"data: {json.dumps({'type': 'connected', 'server': CONFIG.mcp_name})}\n\n"
+                
+                # Keep connection alive with heartbeat
+                while True:
+                    await asyncio.sleep(15)
+                    yield f"data: {json.dumps({'type': 'heartbeat', 'timestamp': time.time()})}\n\n"
+                    
+            except asyncio.CancelledError:
+                debug_stderr("SSE connection closed")
+                raise
+                
+        return StreamingResponse(
+            event_stream(),
+            media_type="text/event-stream",
+            headers={
+                "Cache-Control": "no-cache",
+                "Connection": "keep-alive",
+                "X-Accel-Buffering": "no"  # Disable nginx buffering
+            }
+        )
+    
+    async def http_handler(request):
+        """HTTP POST endpoint for MCP requests"""
+        try:
+            body = await request.json()
+            tool_name = body.get("tool")
+            params = body.get("params", {})
+            
+            if not tool_name:
+                return JSONResponse(
+                    {"error": "Missing 'tool' parameter"},
+                    status_code=400
+                )
+            
+            # Execute tool if it exists
+            if hasattr(mcp, '_tools') and tool_name in mcp._tools:
+                tool_func = mcp._tools[tool_name]
+                
+                if asyncio.iscoroutinefunction(tool_func):
+                    result = await tool_func(**params)
+                else:
+                    result = tool_func(**params)
+                
+                return JSONResponse({
+                    "status": "success",
+                    "tool": tool_name,
+                    "result": result
+                })
+            else:
+                return JSONResponse(
+                    {"error": f"Tool '{tool_name}' not found"},
+                    status_code=404
+                )
+                
+        except json.JSONDecodeError:
+            return JSONResponse(
+                {"error": "Invalid JSON"},
+                status_code=400
+            )
+        except Exception as e:
+            debug_stderr(f"HTTP handler error: {e}")
+            return JSONResponse(
+                {"error": str(e)},
+                status_code=500
+            )
+    
+    async def health_check(request):
+        """Health check endpoint"""
+        health = diagnostics.get_comprehensive_health_summary()
+        return JSONResponse({
+            "status": "healthy",
+            "uptime": health['service_status']['uptime_human'],
+            "requests": health['service_status']['total_requests'],
+            "success_rate": health['service_status']['success_rate']
+        })
+    
+    async def list_tools(request):
+        """List available tools"""
+        tools = []
+        if hasattr(mcp, '_tools'):
+            for name, func in mcp._tools.items():
+                tools.append({
+                    "name": name,
+                    "description": func.__doc__.split('\n')[0] if func.__doc__ else "No description"
+                })
+        return JSONResponse({"tools": tools, "count": len(tools)})
+    
+    # Create Starlette app
+    routes = [
+        Route("/health", health_check, methods=["GET"]),
+        Route("/tools", list_tools, methods=["GET"]),
+    ]
+    
+    if transport == 'sse':
+        routes.append(Route("/sse", sse_handler, methods=["GET"]))
+    
+    if transport == 'http':
+        routes.append(Route("/execute", http_handler, methods=["POST"]))
+    
+    app = Starlette(debug=True, routes=routes)
+    
+    # Add CORS middleware
+    app.add_middleware(
+        CORSMiddleware,
+        allow_origins=["*"],
+        allow_credentials=True,
+        allow_methods=["*"],
+        allow_headers=["*"],
+    )
+    
+    # Configure uvicorn
+    config_kwargs = {
+        "app": app,
+        "host": host,
+        "port": port,
+        "log_level": "info"
+    }
+    
+    # Add SSL if certificates provided
+    if ssl_cert and ssl_key:
+        config_kwargs.update({
+            "ssl_certfile": ssl_cert,
+            "ssl_keyfile": ssl_key
+        })
+        protocol = "https"
+    else:
+        protocol = "http"
+    
+    debug_stderr(f"✓ Server endpoints:")
+    debug_stderr(f"  Health: {protocol}://{host}:{port}/health")
+    debug_stderr(f"  Tools:  {protocol}://{host}:{port}/tools")
+    if transport == 'sse':
+        debug_stderr(f"  SSE:    {protocol}://{host}:{port}/sse")
+    if transport == 'http':
+        debug_stderr(f"  Execute: {protocol}://{host}:{port}/execute")
+    
+    config = uvicorn.Config(**config_kwargs)
+    server = uvicorn.Server(config)
+    server.run()
+
 if __name__ == '__main__':
     try:
         debug_stderr("=== ENHANCED COMPREHENSIVE SECURE SCRIPT EXECUTION START ===")

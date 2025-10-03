@@ -103,13 +103,20 @@ MIST_MAX_ORGS_PER_MSP=5           # Max orgs per MSP
 
 ### Basic Startup
 ```bash
+# Default stdio transport (most common for MCP)
+python enhanced_mist_mcp_server.py
 python enhanced_mist_mcp_server.py --transport stdio
+ 
+# HTTP/SSE transport on specific port
+python enhanced_mist_mcp_server.py -t sse -p 8080
+
+# HTTP transport
+python enhanced_mist_mcp_server.py -t http -H 0.0.0.0 -p 8080
 ```
 
 ### Advanced Options
 ```bash
 python enhanced_mist_mcp_server.py \
-  --transport websocket \
   --host 127.0.0.1 \
   --port 30040 \
   --log-level DEBUG \
@@ -120,7 +127,7 @@ python enhanced_mist_mcp_server.py \
 ```
 Options:
   -H, --host HOST           Server host (default: 127.0.0.1)
-  -t, --transport TRANSPORT Transport type: stdio, streamable-http, websocket
+  -t, --transport TRANSPORT Transport type: stdio (pipes), sse (HTTP), or http protocols
   -p, --port PORT          Server port (default: 30040)
   --log-level LEVEL        Logging level (DEBUG, INFO, WARNING, ERROR, CRITICAL)
   --debug                  Enable maximum debug output
