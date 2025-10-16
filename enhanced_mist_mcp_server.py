@@ -2389,91 +2389,8 @@ async def get_organization(org_id: str) -> str:
 async def get_organization_stats(org_id: str, stats_type: str = "general", page: int = 1, limit: int = 100, 
                                start: int = None, end: int = None, duration: str = "1d", 
                                device_type: str = None, site_id: str = None) -> str:
-    """
-    ORGANIZATION TOOL #2: Enhanced Organization Statistics Analyzer with Multiple Stats Types
-    
-    Function: Retrieves comprehensive statistics and metrics for a specific organization
-              with support for multiple specialized statistics endpoints including general stats,
-              assets, devices, MX edges, and other infrastructure components with flexible 
-              time range and filtering controls
-    
-    API Used: Multiple Mist API endpoints based on stats_type parameter:
-    - GET /api/v1/orgs/{org_id}/stats (general organization statistics)
-    - GET /api/v1/orgs/{org_id}/stats/assets (asset tracking and management statistics)  
-    - GET /api/v1/orgs/{org_id}/stats/devices (device-specific statistics across all device types)
-    - GET /api/v1/orgs/{org_id}/stats/mxedges (MX Edge statistics for SD-WAN and edge computing)
-    - GET /api/v1/orgs/{org_id}/stats/bgp_peers (BGP peering statistics for routing analysis)
-    - GET /api/v1/orgs/{org_id}/stats/sites (site-level aggregated statistics)
-    - GET /api/v1/orgs/{org_id}/stats/clients (client connection and usage statistics)
-    
-    Parameters:
-    - org_id (str): Organization ID to retrieve statistics for (required)
-    - stats_type (str): Type of statistics to retrieve (default: "general")
-                       Valid values: "general", "assets", "devices", "mxedges", "bgp_peers", 
-                                   "sites", "clients", "tunnels", "wireless", "wired"
-    - page (int): Page number for pagination (default: 1)
-    - limit (int): Maximum number of entries per page (default: 100, max: 1000)
-    - start (int): Start time as Unix timestamp (optional, overrides duration)
-    - end (int): End time as Unix timestamp (optional, used with start)
-    - duration (str): Time period when start/end not specified (default: "1d")
-                     Valid values: "1h", "1d", "1w", "1m"
-    - device_type (str): Filter by device type for device stats (ap, switch, gateway, mxedge)
-    - site_id (str): Filter by specific site ID for scoped statistics
-    
-    Response Handling:
-    - Returns JSON with comprehensive organization metrics and statistics based on type
-    - Shows total counts, performance metrics, and time-series data for the specified type
-    - Includes specialized metrics per stats type (assets: tracking/location, devices: health/performance)
-    - Reports network performance statistics over specified time range
-    - Contains Service Level Expectation (SLE) metrics where applicable
-    - Shows alarm and event summary statistics for the time period
-    - Supports pagination for large datasets with next page indicators
-    
-    Time Range Logic:
-    - If start & end provided: Uses specific timestamp range (Unix timestamps)
-    - If only duration provided: Uses relative time period from now
-    - Default duration: "1d" (last 24 hours)
-    - Statistics data updated every 10 minutes, recommended 1-hour intervals for trends
-    
-    Enhanced Features:
-    - Multi-endpoint support for specialized statistics types
-    - Flexible time range control (absolute timestamps or relative duration)
-    - Pagination support for large organizations with many resources
-    - Device-type filtering for focused analysis
-    - Site-scoped statistics for multi-site organizations
-    - Trend analysis compared to previous periods using time series data
-    - Performance benchmarking against org baselines over time
-    - Geographic distribution of resources and usage patterns
-    - Health score calculation and reporting with historical context
-    - Resource utilization efficiency metrics with time-based analysis
-    - Enhanced error handling and fallback mechanisms
-    
-    Stats Type Descriptions:
-    - "general": Overall organization health, sites, devices, users, performance
-    - "assets": Asset tracking, location services, asset management metrics
-    - "devices": Device health, performance, connectivity across all device types
-    - "mxedges": MX Edge specific stats for SD-WAN, tunnels, edge services
-    - "bgp_peers": BGP routing statistics, peer status, route advertisements
-    - "sites": Site-level aggregated statistics and performance metrics
-    - "clients": Wireless and wired client statistics, sessions, usage patterns
-    - "tunnels": VPN and overlay tunnel statistics, performance, availability
-    - "wireless": Wi-Fi specific statistics, RF performance, client experience
-    - "wired": Ethernet/switch statistics, port utilization, link performance
-    
-    Use Cases:
-    - Comprehensive organization health monitoring with specialized focus areas
-    - Asset management and tracking analysis for location-aware deployments
-    - Device fleet management and performance optimization across device types
-    - SD-WAN and edge computing performance analysis via MX Edge stats
-    - Network routing analysis and BGP peer performance monitoring
-    - Multi-site performance comparison and benchmarking
-    - Client experience analysis across wireless and wired infrastructure
-    - Capacity planning and resource allocation based on historical trends
-    - Performance trend analysis and reporting over custom time ranges
-    - Executive summary and KPI reporting with specific date ranges and focus
-    - Multi-organization comparison and benchmarking over time periods
-    - Compliance reporting with specific audit time windows
-    - Historical analysis for troubleshooting performance issues
+    f"""
+    {get_tool_documentation("get_organization_stats")}
     """
     try:
         debug_stderr(f"Executing enhanced get_organization_stats for org {org_id}, type: {stats_type}...")
@@ -2755,116 +2672,8 @@ async def get_org_bgp_peers_enhanced(
     route_type: str = None,
     discovery_mode: bool = None  # New parameter for auto-discovery
 ) -> str:
-    """
-    CRITICAL TOOL FOR EVPN FABRIC HEALTH ANALYSIS
-    ==============================================
-    
-    Function: Retrieve and analyze BGP peer statistics across the entire organization.
-    This is the PRIMARY tool for validating BGP state on any device or EVPN fabric control plane health.
-    
-    EVPN FABRIC HEALTH WORKFLOW - ALWAYS USE THIS TOOL:
-    ========================================================
-    When analyzing EVPN fabric health , this tool should be called IMMEDIATELY after 
-    topology validation and alarm checking to verify:
-    
-    1. BGP Session States: Are all underlay/overlay peers Established?
-    3. Peer Stability: Check for session flaps or high flap counts
-    4. Route Counts: Verify expected route counts per peer
-    5. Performance: Check uptime and convergence metrics
-    
-    EVPN FABRIC HEALTH CHECK - RECOMMENDED USAGE:
-    ==============================================
-    
-    Step 1 - Discovery Mode (Get ALL BGP peers):
-        get_org_bgp_peers_enhanced(
-            org_id="xxx",
-            discovery_mode=True  # or omit all filters
-        )
-        → Returns comprehensive BGP health with automatic analysis
-        → Identifies issues
-        → Groups by status, ASN, route types
-    
-    Step 2 - Troubleshoot Specific Issues (if Step 1 shows problems):
-        # Check peers in non-Established state
-        get_org_bgp_peers_enhanced(
-            org_id="xxx",
-            peer_status="idle"  # or "active", "connect"
-        )
-        
-        # Check specific site's BGP peers
-        get_org_bgp_peers_enhanced(
-            org_id="xxx",
-            site_id="yyy"
-        )
-        
-        # Check EVPN overlay peers
-        get_org_bgp_peers_enhanced(
-            org_id="xxx",
-            route_type="evpn"
-        )
-    
-    Step 3 - Detailed EVPN Validation (use shell commands AFTER BGP check):
-        Only use execute_custom_shell_command() for:
-        - show evpn database (MAC/IP learning)
-        - show evpn instance (VNI status)
-        - show interfaces vtep (VTEP health)
-        - show evpn ip-prefix-database (Type 5 routes)
-    
-    WHY THIS TOOL IS SUPERIOR TO SHELL COMMANDS FOR BGP:
-    ====================================================
-    ✓ Single API call retrieves ALL BGP peers across entire fabric
-    ✓ Automatic health analysis and scoring
-    ✓ No per-device delay (shell commands take ~5-10 seconds EACH)
-    ✓ Structured JSON response vs parsing CLI output
-    ✓ Built-in filtering, pagination, and time-range support
-    ✓ Historical data available (duration: 1h, 1d, 1w, 1m)
-    
-    API Used: GET /api/v1/orgs/{org_id}/stats/bgp_peers/search
-    
-    Parameters:
-        org_id (str): Organization ID (REQUIRED)
-        bgp_peer (str): BGP peer IP address or hostname filter
-        neighbor_mac (str): Neighbor device MAC address filter
-        site_id (str): Filter by specific site
-        vrf_name (str): VRF name filter
-        mac (str): Local device MAC address filter
-        start (int): Start time as Unix timestamp (overrides duration)
-        end (int): End time as Unix timestamp (used with start)
-        duration (str): Time period - "1h", "6h", "1d", "1w", "1m" (default: "6h")
-        limit (int): Max entries per page (default: 100, max: 1000)
-        page (int): Page number for pagination (default: 1)
-        peer_status (str): Filter by BGP state (established, idle, active, connect, opensent, openconfirm)
-        asn (str): Filter by Autonomous System Number
-        route_type (str): Filter by route type (ipv4, ipv6, evpn, l3vpn)
-        discovery_mode (bool): Auto-enabled when no filters provided
-    
-    Discovery Mode (Auto-enabled when no filters):
-        When discovery_mode=True or no filters provided:
-        - Returns ALL BGP peers for comprehensive health overview
-        - Provides aggregate statistics and health summary
-        - Groups results by peer status, ASN, and route types
-        - Calculates overall health score (0-100)
-        - Identifies potential issues automatically
-        - Shows peer distribution and performance metrics
-    
-    Returns:
-        JSON with:
-        - bgp_peers: Array of BGP peer objects with detailed metrics
-        - bgp_analysis: Comprehensive health analysis (in discovery mode)
-        - health_summary: Overall status and health score
-        - peer_status_summary: Count by state (established/idle/down)
-        - as_distribution: Peers grouped by ASN
-        - route_type_distribution: Peers by address family
-        - performance_metrics: Uptime, routes, flaps, health indicators
-        - network_topology: Unique ASNs, EVPN/IPv4/IPv6 peer counts
-       
-    Example Workflow for EVPN Fabric Health Check:
-        1. Get user info and topology → identify org_id, site_id
-        2. Check alarms → get_alarms()
-        3. CHECK BGP HEALTH → get_org_bgp_peers_enhanced(org_id, discovery_mode=True)
-        4. IF health_score < 90 → investigate specific issues with filters
-        5. THEN use shell commands for EVPN-specific details (database, VTEPs)
-        6. Analyze events for historical patterns
+    f"""
+    {get_tool_doc('get_org_bgp_peers_enhanced')}
     """
     try:
         debug_stderr(f"Executing enhanced search_org_bgp_peers for org {org_id}...")
@@ -3691,6 +3500,65 @@ async def get_site_info(site_id: str) -> str:
 @safe_tool_definition("get_site_devices", "site")
 async def get_site_devices(site_id: str, device_type: str = None) -> str:
     f"""
+    Function: Get device configurations for a site by type
+    CRITICAL DECISION TREE - READ CAREFULLY:
+    ┌─ Do you KNOW the exact device types present at this site? ─┐
+    │                                                            │
+    ├─ YES (user specified OR previously discovered)             │
+    │  └─ Use get_site_devices(site_id, device_type) directly    │
+    │                                                            │
+    └─ NO (unknown site OR user didn't specify device types)     │
+        └─ MANDATORY: Use get_org_inventory() FIRST              │
+            └─ Then call get_site_devices() for each discovered type    
+
+    API: GET /api/v1/sites/{site_id}/devices
+
+    Parameters: site_id (required), device_type (optional, defaults to "ap")
+    WARNING: Without device_type, only returns APs. For all configs, call separately for each type.
+    Returns: Device configurations for specified type only
+    Use: Get actual device configurations after knowing what types exist
+
+    Function: Get device configurations for a site by type with gateway template integration
+    API: GET /api/v1/sites/{site_id}/devices + GET /api/v1/orgs/{org_id}/gatewaytemplates
+    Parameters: site_id (required), device_type (optional, defaults to "ap")
+    WARNING: Without device_type, only returns APs. For all configs, call separately for each type.
+    Returns: Device configurations for specified type with enhanced gateway template data
+    Use: Get actual device configurations after knowing what types exist
+
+    GATEWAY ENHANCED CONFIGURATION RETRIEVAL:
+    When device_type="gateway" or when gateways are detected in the response:
+    - Automatically retrieves organization gateway templates via get_org_templates(org_id,gatewaytemplates)
+    - Matches gateway devices to their assigned gateway template using gatewaytemplate_id
+    - Supplements basic gateway device config with full template configuration including:
+    * Complete interface configurations
+    * Routing policies and protocols (BGP, OSPF, static routes)
+    * Security zones and policies
+    * NAT and firewall rules
+    * VPN tunnel configurations
+    * WAN edge and SD-WAN policies
+    * DHCP and DNS configurations
+    - Provides template vs device configuration comparison for drift detection
+    - Returns merged configuration showing both Mist-managed settings and template-defined config
+    - Enables bulk configuration analysis without individual shell command delays
+
+    TEMPLATE MATCHING LOGIC:
+    - Uses gatewaytemplate_id from device configuration
+    - Falls back to site-level gatewaytemplate_id if device-level not specified
+    - Handles cases where gateways use organization default templates
+    - Provides template inheritance hierarchy information
+
+    CONFIGURATION DRIFT DETECTION:
+    - Compares template-defined configuration with device-reported configuration
+    - Identifies deviations between intended (template) and actual (device) state
+    - Enables proactive configuration management and compliance reporting
+    - Supports bulk configuration validation across gateway fleet
+
+    IMPORTANT: By default (when no device_type is specified), this function ONLY returns Access Points (APs).
+    EFFICIENCY: Use inventory first only when discovering unknown device types,
+    For known device types, call get_site_devices directly with specific device_type
+    Example: If you know site has only switches, call get_site_devices(site_id, "switch") directly 
+
+    See also:
     {get_tool_doc('get_site_devices')}
     """
     #doc = get_tool_doc('get_site_devices')
@@ -4020,6 +3888,69 @@ async def device_action(site_id: str, device_id: str, action: str, action_params
 @safe_tool_definition("execute_custom_shell_command", "device")
 async def execute_custom_shell_command(site_id: str, device_id: str, command: str, timeout: int = 30) -> str:
     f"""
+    Execute a custom shell command on a Junos device (with enhanced timeout handling)
+
+    IMPORTANT: Use this tool ONLY when the required information is NOT available via API.
+    For BGP statistics, use get_org_bgp_peers_enhanced() instead - it's much faster and 
+    provides bulk data without individual device delays.
+
+    Enhanced function to execute commands on devices where no API endpoints are available.
+
+    EVPN FABRIC HEALTH ANALYSIS - USE CASES:
+    ========================================
+    For comprehensive EVPN fabric health checks, use this tool to verify:
+
+    1. EVPN Control Plane Status (DETAILED):
+        - show evpn instance extensive         # VNI status with detail
+        - show evpn database extensive         # MAC/IP table with timestamps
+        - show route table bgp.evpn.0          # EVPN route table
+        - show evpn l3-context                 # L3 VNI context
+        
+    2. BGP Session Details (when get_org_bgp_peers_enhanced insufficient):
+        - show bgp summary                     # Quick peer overview
+        - show bgp neighbor <ip> extensive     # Detailed peer info
+        - show route receive-protocol bgp <neighbor>
+        - show route advertising-protocol bgp <neighbor>
+        
+    3. VXLAN Data Plane Verification:
+        - show interfaces vtep extensive       # VTEP details
+        - show pfe vxlan nh-usage              # Nexthop usage (EX4400/QFX)
+        - show evpn instance extensive         # EVPN instance details
+        
+    4. Underlay Health (IPv4 or IPv6 based fabrics):
+        - show route table inet6.0            # IPv6 underlay routes
+        - show route table inet.0             # IPv4 underlay routes
+        - show bfd session extensive          # BFD state with detail
+        - show interfaces terse | match "up|down"  # Interface status
+        
+    5. MAC Learning and Troubleshooting:
+        - show ethernet-switching table       # Local MAC table (includes GBP)
+        - show ethernet-switching mac-learning-log  # MAC learn events
+        - show evpn arp-table                 # EVPN ARP entries
+
+    6. System route capacity utilization
+        - show pfe route summary hw         # Hadware capacity of Packefe Forwarding Engine (PFE )
+
+    INTERPRETING JUNOS LICENSE WARNINGS:
+    When you see "Warning: License key missing" in BGP/OSPF/EVPN output:
+    - This is informational only
+    - The protocol still operates fully
+    - Focus on actual state (Established/Active/Idle) not license warnings but warn user that is is breaching Juniper license agreement
+
+    DO NOT USE for BGP peer status - use get_org_bgp_peers_enhanced() instead.
+
+    API Used: POST /api/v1/sites/{site_id}/devices/{device_id}/shell/execute
+
+    Parameters:
+        site_id: Site identifier
+        device_id: Device identifier  
+        command: Shell command to execute
+        timeout: Command timeout in seconds (5-300, default: 30)
+
+    Returns:
+        JSON with command output, execution time, and status
+
+    See also:
     {get_tool_doc('execute_custom_shell_command')}
     """
     debug_stderr(f"Executing enhanced shell command: {command}")

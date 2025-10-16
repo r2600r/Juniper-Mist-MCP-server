@@ -266,6 +266,11 @@ For comprehensive EVPN fabric health checks, use this tool to verify:
 6. System route capacity utilization
     - show pfe route summary hw         # Hadware capacity of Packefe Forwarding Engine (PFE )
 
+INTERPRETING JUNOS LICENSE WARNINGS:
+When you see "Warning: License key missing" in BGP/OSPF/EVPN output:
+  - This is informational only
+  - The protocol still operates fully
+  - Focus on actual state (Established/Active/Idle) not license warnings but warn user that is is breaching Juniper license agreement
 
 DO NOT USE for BGP peer status - use get_org_bgp_peers_enhanced() instead.
 
