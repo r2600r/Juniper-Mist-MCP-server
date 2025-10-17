@@ -2,7 +2,8 @@
 
 ## Overview
 
-A comprehensive Model Context Protocol (MCP) server providing complete access to the Juniper Mist Cloud API with advanced security analysis, diagnostics, and EVPN fabric management capabilities.
+A Model Context Protocol (MCP) server providing complete access to the Juniper Mist Cloud API with advanced security analysis, diagnostics, and EVPN fabric.
+Offers ability to troubleshoot individual devices via shell command over if no REST API exist.
 
 ## Key Features
 
@@ -55,7 +56,7 @@ A comprehensive Model Context Protocol (MCP) server providing complete access to
 
 ### Dependencies
 ```bash
-pip3 install fastmcp httpx websockets psutil python-dotenv
+pip3 install fastmcp httpx websockets psutil python-dotenv uvicorn starlette
 ```
 
 ### Required Environment Variables
@@ -112,6 +113,9 @@ python enhanced_mist_mcp_server.py -t sse -p 8080
 
 # HTTP transport
 python enhanced_mist_mcp_server.py -t http -H 0.0.0.0 -p 8080
+
+# HTTPS transport
+python enhanced_mist_mcp_server.py -t sse -p 8443 --ssl-cert /path/to/cert.pem --ssl-key /path/to/key.pem
 ```
 
 ### Advanced Options
@@ -129,6 +133,8 @@ Options:
   -H, --host HOST           Server host (default: 127.0.0.1)
   -t, --transport TRANSPORT Transport type: stdio (pipes), sse (HTTP), or http protocols
   -p, --port PORT          Server port (default: 30040)
+  --ssl-crt PATH           path to certificate file for HTTPS
+  --ssl-key PATH           path to SSL key file for HTTPS
   --log-level LEVEL        Logging level (DEBUG, INFO, WARNING, ERROR, CRITICAL)
   --debug                  Enable maximum debug output
   --validate-config        Validate configuration and exit
@@ -277,6 +283,7 @@ python3 enhanced_mist_mcp_server.py --debug --log-level DEBUG
 
 ## Version History
 
+- **v4.0** - Logic and Docs in separate file
 - **v3.1** - Complete API Coverage with Security Analysis
 - **v3.0** - Enhanced EVPN Fabric Management
 - **v2.0** - Security Framework Integration

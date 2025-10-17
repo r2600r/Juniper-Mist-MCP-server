@@ -3812,23 +3812,45 @@ async def get_site_insights(site_id: str, metric: str = None) -> str:
 # DEVICE MANAGEMENT & STATISTICS FUNCTIONS
 
 # DEVICE MANAGEMENT TOOLS (5 tools):
-# - get_device_stats: Device performance metrics
+# - get_device_stats: Device statistics
 # - device_action: Perform device actions  
 # - execute_custom_shell_command: Shell command execution
 # - get_enhanced_device_info: Comprehensive device data
 
 
 @safe_tool_definition("get_device_stats", "device")
-async def get_device_stats(site_id: str, device_id: str = None, metric: str = None) -> str:
-    """Get device statistics and performance metrics"""
+async def get_device_stats(site_id: str, device_id: str = None, metric: str = None, type: str = None) -> str:
+    """
+    Provides comprehensive statistics for a specific device if device_id is provided or all devices based on type within a site
+    Output with only tpe can be large depending on number of devices in site 
+    
+    API Used: GET /api/v1/sites/{site_id}/stats/devices/{device_id} or /api/v1/sites/{site_id}/stats/devices
+    Type of device can be specified for bulk site retrieval.Exmaple are "switch", "ap", "gateway". Default Type is "ap"
+
+    Returns detailed device statistics including:
+    - junos version
+    - junos uptime
+    - cpu and memory statistics
+    - detailed interface statistics (traffic, errors, discards)
+    - configuration commit history
+    - route summary statistics
+    - connected clients information
+    - module statistics
+    - virtual chassis details
+    - ARP & MAC Table Statistics
+    - last configuration commit status
+    """
     try:
         debug_stderr(f"################# Executing get_device_stats for site {site_id}, device {device_id}... #################")
         client = get_api_client()
         
         if device_id:
-            endpoint = f"/api/v1/sites/{site_id}/stats/devices/{device_id}/clients"
+            endpoint = f"/api/v1/sites/{site_id}/stats/devices/{device_id}"
         else:
-            endpoint = f"/api/v1/sites/{site_id}/stats/devices"
+            if type: 
+                endpoint = f"/api/v1/sites/{site_id}/stats/devices?type={type}"
+            else:
+                endpoint = f"/api/v1/sites/{site_id}/stats/devices"
         
         params = {}
         if metric:
@@ -3888,69 +3910,6 @@ async def device_action(site_id: str, device_id: str, action: str, action_params
 @safe_tool_definition("execute_custom_shell_command", "device")
 async def execute_custom_shell_command(site_id: str, device_id: str, command: str, timeout: int = 30) -> str:
     f"""
-    Execute a custom shell command on a Junos device (with enhanced timeout handling)
-
-    IMPORTANT: Use this tool ONLY when the required information is NOT available via API.
-    For BGP statistics, use get_org_bgp_peers_enhanced() instead - it's much faster and 
-    provides bulk data without individual device delays.
-
-    Enhanced function to execute commands on devices where no API endpoints are available.
-
-    EVPN FABRIC HEALTH ANALYSIS - USE CASES:
-    ========================================
-    For comprehensive EVPN fabric health checks, use this tool to verify:
-
-    1. EVPN Control Plane Status (DETAILED):
-        - show evpn instance extensive         # VNI status with detail
-        - show evpn database extensive         # MAC/IP table with timestamps
-        - show route table bgp.evpn.0          # EVPN route table
-        - show evpn l3-context                 # L3 VNI context
-        
-    2. BGP Session Details (when get_org_bgp_peers_enhanced insufficient):
-        - show bgp summary                     # Quick peer overview
-        - show bgp neighbor <ip> extensive     # Detailed peer info
-        - show route receive-protocol bgp <neighbor>
-        - show route advertising-protocol bgp <neighbor>
-        
-    3. VXLAN Data Plane Verification:
-        - show interfaces vtep extensive       # VTEP details
-        - show pfe vxlan nh-usage              # Nexthop usage (EX4400/QFX)
-        - show evpn instance extensive         # EVPN instance details
-        
-    4. Underlay Health (IPv4 or IPv6 based fabrics):
-        - show route table inet6.0            # IPv6 underlay routes
-        - show route table inet.0             # IPv4 underlay routes
-        - show bfd session extensive          # BFD state with detail
-        - show interfaces terse | match "up|down"  # Interface status
-        
-    5. MAC Learning and Troubleshooting:
-        - show ethernet-switching table       # Local MAC table (includes GBP)
-        - show ethernet-switching mac-learning-log  # MAC learn events
-        - show evpn arp-table                 # EVPN ARP entries
-
-    6. System route capacity utilization
-        - show pfe route summary hw         # Hadware capacity of Packefe Forwarding Engine (PFE )
-
-    INTERPRETING JUNOS LICENSE WARNINGS:
-    When you see "Warning: License key missing" in BGP/OSPF/EVPN output:
-    - This is informational only
-    - The protocol still operates fully
-    - Focus on actual state (Established/Active/Idle) not license warnings but warn user that is is breaching Juniper license agreement
-
-    DO NOT USE for BGP peer status - use get_org_bgp_peers_enhanced() instead.
-
-    API Used: POST /api/v1/sites/{site_id}/devices/{device_id}/shell/execute
-
-    Parameters:
-        site_id: Site identifier
-        device_id: Device identifier  
-        command: Shell command to execute
-        timeout: Command timeout in seconds (5-300, default: 30)
-
-    Returns:
-        JSON with command output, execution time, and status
-
-    See also:
     {get_tool_doc('execute_custom_shell_command')}
     """
     debug_stderr(f"Executing enhanced shell command: {command}")
@@ -3979,7 +3938,7 @@ async def execute_custom_shell_command(site_id: str, device_id: str, command: st
             "max_output_size": result.max_output_size
         }
         
-        debug_stderr("✓ Enhanced execute_custom_shell_command completed")
+        debug_stderr("################# ✓ Enhanced execute_custom_shell_command completed")
         return json.dumps(result_dict, indent=2)
         
     except Exception as e:
@@ -3993,12 +3952,9 @@ async def execute_custom_shell_command(site_id: str, device_id: str, command: st
         }, indent=2)
 
 @safe_tool_definition("get_enhanced_device_info", "device")
-async def get_enhanced_device_info(site_id: str, device_id: str, include_shell_data: bool = False) -> str:
-    """
-    Get comprehensive device configuration, optionally including shell-based data
-    device_id format must be full MAC address,  e.g. "bc0ffe15c700" prepended by"00000000-0000-0000-1000-"
-    Example: "00000000-0000-0000-1000-bc0ffe15c700
-
+async def get_enhanced_device_info(site_id: str, device_id: str) -> str:
+    f"""
+    {get_tool_doc('get_enhanced_device_info')}
     """
     try:
         debug_stderr(f"Getting enhanced device info for {device_id}")
@@ -4006,31 +3962,33 @@ async def get_enhanced_device_info(site_id: str, device_id: str, include_shell_d
         
         # Get basic device info via API
         api_result = await client.make_request(f"/api/v1/sites/{site_id}/devices/{device_id}")
+        stats_result = await client.make_request(f"/api/v1/sites/{site_id}/stats/devices/{device_id}")
         
         result = {
             "device_id": device_id,
             "site_id": site_id,
             "timestamp": datetime.now().isoformat(),
-            "api_data": api_result
+            "device_configuration_data": api_result,
+            "device_stats": stats_result
         }
         
-        if include_shell_data and api_result.get("status") == "SUCCESS":
+        if api_result.get("status") == "SUCCESS"  and stats_result.get("status") == "SUCCESS":
             debug_stderr("Fetching enhanced shell-based device information")
             
             # Execute enhanced shell commands for additional data
             shell_commands = [
-                "show version brief",
-                "show system uptime", 
-                "show chassis hardware brief",
-                "show interfaces terse",
+                "show chassis hardware",
                 "show system alarms",
-                "show log messages | last 10"
+                "show chassis alarms",
+                "show system core-dumps",
+                "show route summary",
+                "show log messages | last 100 | no-more"
             ]
             
             shell_results = {}
             for cmd in shell_commands:
                 shell_result = await client.shell_executor.execute_command(
-                    site_id, device_id, cmd, max_runtime=25, max_output_size=5000
+                    site_id, device_id, cmd, max_runtime=25, max_output_size=7000
                 )
                 shell_results[cmd] = {
                     "success": shell_result.success,
@@ -5379,61 +5337,8 @@ async def search_org_wired_clients(
     end: int = None,
     duration: str = "1d"
 ) -> str:
-    """
-    CLIENT TOOL #2: Search Organization Wired Clients
-    
-    Function: Search for wired clients across an organization with detailed
-              filtering options for switch-connected devices
-    
-    API Used: GET /api/v1/orgs/{org_id}/wired_clients/search
-    
-    Parameters:
-    - org_id (str): Organization ID (required)
-    - auth_state (str): Authentication state
-    - auth_method (str): Authentication method used
-    - source (str): Source of client learning (lldp, mac)
-    - site_id (str): Filter by specific site
-    - device_mac (str): Gateway/Switch MAC where client connected
-    - mac (str): Client MAC address (partial/full)
-    - port_id (str): Switch port where client connected
-    - vlan (int): VLAN ID
-    - ip_address (str): Client IP address
-    - manufacture (str): Client manufacturer
-    - text (str): General search (MAC, hostname, username)
-    - nacrule_id (str): NAC rule ID if matched
-    - dhcp_hostname (str): DHCP hostname
-    - dhcp_fqdn (str): DHCP FQDN
-    - dhcp_client_identifier (str): DHCP client identifier
-    - dhcp_vendor_class_identifier (str): DHCP vendor class
-    - dhcp_request_params (str): DHCP request parameters
-    - limit (int): Maximum results (default: 100)
-    - start (int): Start time (epoch or relative)
-    - end (int): End time (epoch or relative)
-    - duration (str): Time duration (e.g., 1d, 1w)
-    
-    Response Handling:
-    - Returns JSON array of wired clients matching criteria
-    - Shows client MAC, IP, and connection port details
-    - Reports authentication status and method
-    - Includes DHCP information and fingerprinting
-    - Shows VLAN assignments and NAC rule matches
-    - Reports switch/port connection information
-    
-    Enhanced Features:
-    - DHCP fingerprinting and analysis
-    - NAC integration and rule tracking
-    - Port-level client visibility
-    - LLDP neighbor discovery
-    - Authentication method tracking
-    - Manufacturer identification
-    
-    Use Cases:
-    - Troubleshoot wired connectivity issues
-    - Audit switch port usage and connections
-    - Track NAC policy enforcement
-    - Monitor VLAN assignments
-    - Investigate unauthorized devices
-    - Generate wired client inventory
+    f"""
+    {get_tool_doc('search_org_wired_clients')}
     """
     try:
         debug_stderr(f"Executing search_org_wired_clients for org {org_id}...")
@@ -5543,70 +5448,8 @@ async def search_org_nac_clients(
     limit: int = 100,
     page: int = 1
 ) -> str:
-    """
-    CLIENT TOOL #3: Search Organization NAC Clients
-    
-    Function: Search for NAC (Network Access Control) clients across an organization
-              with comprehensive filtering for policy enforcement and compliance
-    
-    API Used: GET /api/v1/orgs/{org_id}/nac_clients/search
-    
-    Parameters:
-    - org_id (str): Organization ID (required)
-    - nacrule_id (str): NAC Policy Rule ID if matched
-    - nacrule_matched (bool): Whether NAC rule was matched
-    - auth_type (str): Authentication type (eap-tls, eap-peap, mab, psk, etc.)
-    - vlan (str): VLAN name or ID assigned
-    - nas_vendor (str): Vendor of NAS device
-    - idp_id (str): SSO/Identity Provider ID if used
-    - ssid (str): SSID name
-    - username (str): Username presented by client
-    - timestamp (float): Start time in epoch
-    - site_id (str): Site ID filter
-    - ap (str): AP MAC connected to
-    - mac (str): Client MAC address
-    - mdm_managed (bool): Filter by MDM management status
-    - status (str): Connection status (permitted, denied, session_started, session_ended)
-    - type (str): Client type (wireless, wired)
-    - mdm_compliance (str): MDM compliance status
-    - family (str): Client family (Phone/Tablet, Access Point, etc.)
-    - model (str): Client model
-    - os (str): Client operating system
-    - hostname (str): Client hostname
-    - mfg (str): Client manufacturer
-    - mdm_provider (str): MDM provider (intune, jamf, etc.)
-    - sort (str): Sort options (- prefix for DESC)
-    - usermac_label (list): Labels from usermac entry
-    - ingress_vlan (str): Vendor-specific VLAN in RADIUS
-    - start (int): Start time (epoch or relative)
-    - end (int): End time (epoch or relative)
-    - duration (str): Time duration (default: 1d)
-    - limit (int): Max results (default: 100)
-    - page (int): Page number (default: 1)
-    
-    Response Handling:
-    - Returns JSON array of NAC clients with compliance details
-    - Shows authentication type and status
-    - Reports NAC rule matches and policy enforcement
-    - Includes MDM integration and compliance status
-    - Shows device profiling and classification
-    - Reports connection status and session details
-    
-    Enhanced Features:
-    - NAC policy rule tracking and analysis
-    - MDM integration and compliance monitoring
-    - Multi-factor authentication tracking
-    - Device profiling and fingerprinting
-    - Session state management
-    - Identity provider integration
-    
-    Use Cases:
-    - Monitor NAC policy enforcement
-    - Track MDM compliance across devices
-    - Audit authentication methods and success rates
-    - Investigate policy violations
-    - Generate compliance reports
-    - Troubleshoot NAC authentication issues
+    f"""
+    {get_tool_doc('search_org_nac_clients')}
     """
     try:
         debug_stderr(f"Executing search_org_nac_clients for org {org_id}...")
@@ -5722,59 +5565,8 @@ async def search_org_wireless_clients(
     end: int = None,
     duration: str = "1d"
 ) -> str:
-    """
-    CLIENT TOOL #1: Search Organization Wireless Clients
-    
-    Function: Search for wireless clients across an organization with comprehensive
-              filtering options and client details
-    
-    API Used: GET /api/v1/orgs/{org_id}/clients/search
-    
-    Parameters:
-    - org_id (str): Organization ID (required)
-    - site_id (str): Filter by specific site ID
-    - mac (str): Partial/full MAC address to search
-    - ip_address (str): Client IP address
-    - hostname (str): Partial/full hostname
-    - band (str): Radio band (24, 5, 6)
-    - device (str): Device type (e.g., Mac, iPhone, Android)
-    - os (str): Operating system (for Marvis Client app users)
-    - model (str): Device model (for Marvis Client app users)
-    - ap (str): AP MAC where client connected
-    - psk_id (str): PSK ID for PPSK authentication
-    - psk_name (str): PSK name for PPSK authentication
-    - username (str): Username for 802.1X authentication
-    - vlan (str): VLAN assignment
-    - ssid (str): SSID name
-    - text (str): General text search (MAC, hostname, username, IP)
-    - limit (int): Maximum results (default: 100)
-    - start (int): Start time (epoch or relative)
-    - end (int): End time (epoch or relative)
-    - duration (str): Time duration (e.g., 1d, 1w)
-    
-    Response Handling:
-    - Returns JSON array of wireless clients matching criteria
-    - Shows client MAC, IP, hostname, and connection details
-    - Reports authentication method and status
-    - Includes device type, OS, and model information
-    - Shows connection metrics (RSSI, data rates, band)
-    - Reports VLAN assignments and PSK details
-    
-    Enhanced Features:
-    - Multi-dimensional search capabilities
-    - Real-time and historical client data
-    - Authentication method tracking
-    - Device fingerprinting and classification
-    - Connection quality metrics
-    - Roaming history and patterns
-    
-    Use Cases:
-    - Troubleshoot client connectivity issues
-    - Track specific devices across the network
-    - Audit authentication methods and success rates
-    - Monitor client distribution across bands/SSIDs
-    - Investigate security incidents
-    - Generate client inventory reports
+    f"""
+    {get_tool_doc('search_org_wireless_clients')}
     """
     try:
         debug_stderr(f"Executing search_org_wireless_clients for org {org_id}...")
