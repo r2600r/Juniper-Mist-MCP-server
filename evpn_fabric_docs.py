@@ -22,26 +22,30 @@ Key Technical Areas Covered:
 # =============================================================================
 
 EVPN_ORG_TOOL_DOC = """
-    EVPN FABRIC TOOL #1: Organization-Level EVPN Topology Manager
+    EVPN FABRIC TOOL #1: Organization EVPN Topology Manager
 
-    Function: Retrieves organization-level EVPN fabrics that span multiple sites
+    Function: Retrieves ALL EVPN fabrics in organization that span multiple sites
             or manage cross-site fabric coordination. Organization fabrics are
             used when pods/buildings are distributed across different sites,
             each requiring different configurations from separate site templates.
+            All MIST EVPN Fabric use eBGP for underlay and overlay peering.
 
     API Used: GET /api/v1/orgs/{org_id}/evpn_topologies?for_site=any
+
+    CRITICAL: 
+    1. EVPN fabric health must include BGP peers status, Instead of inefficient queary by eahc device via execute_custom_shell_command, use search_org_bgp_stats() to provide farbric overlay/underlay status!
+    2. No need for side_id parameter, as ?for_site=any organization fabrics will return all fabrics in any sites within the organization with site_id included in the response
 
     EVPN Fabric Architecture Understanding:
     =====================================
     1. **Organization-Level Fabrics:**
+    - ONLY if site_only_fabric = false is return
     - ?for_site=any" in API call returns fabrics in any sites within the organization with their unique topology_id
     - Span multiple sites within an organization
-    - site_only_fabric = false is return
-    - Multiple fabrics per org supported but are not common
-
+    - Multiple fabrics per org supported
 
     2. **Site-Level Fabrics:**
-    - site_only_fabric = true is return
+    - ONLY if site_only_fabric = true is return
     - Contained within a single site boundary
     - Share the same switch template configuration
     - Multiple fabrics can exist within one site
@@ -50,7 +54,7 @@ EVPN_ORG_TOOL_DOC = """
     Response Handling:
     - site fabric when site_only_fabric is true is return
     - organization fabric when site_only_fabric is false is return
-    - Returns JSON array of organization-level EVPN fabrics
+    - Returns JSON array of organization-level EVPN fabrics with unique topology IDs
     - Shows fabric names, topology types, and creation timestamps
     - Reports underlay/overlay configuration (AS numbers, subnets)
     - Contains pod assignments and site relationships
@@ -59,17 +63,14 @@ EVPN_ORG_TOOL_DOC = """
 
     Enhanced Features:
     - Fabric scope analysis (org vs site level)
-    - Cross-site topology validation
-    - Pod distribution across multiple sites
+    - Organization level Fabrics have Pod distribution across multiple sites
     - Template inheritance tracking
-    - Centralized policy enforcement status
 
     Use Cases:
+    - Provide all EVPN fabrics in organization for initial discovery
     - Multi-site campus network management
-    - Healthcare system with multiple hospital locations
-    - Enterprise networks spanning multiple buildings/sites
+    - Enterprise networks spanning multiple buildings/sites using PODS
     - Cross-site EVPN fabric coordination and troubleshooting
-    - Organization-wide fabric policy enforcement
 """
 
 EVPN_SITE_TOOL_DOC = """
@@ -121,21 +122,18 @@ EVPN_SITE_TOOL_DOC = """
 """
 
 EVPN_DETAILS_TOOL_DOC = """
-    EVPN FABRIC TOOL #3: Comprehensive Topology Detail Analyzer
+    EVPN FABRIC TOOL #3: Comprehensive EVPN Fabric Topology Detail Analyzer
+    
+    Function: Get detailed EVPN fabric topology information and configuration for a site or organization based on topology ID and site_only_fabric flag.
+    - Org Fabrics PODS could get different configurations from switch templates(networktemplates) assigned to sites
+    - Site Fabrics PODS get same configuration from single switch template assigned to the site
+    - Provides centralized fabric configuration details
+    - specific recommendations based on evpn overlay type (edge/core/distribution, collapsed-core, bridged)
 
-    - Used when network pods/buildings are distributed across sites
-    - Each site could get different configurations from switch templates
-    - Single switch templates can be assigned to multiple sites, but site can only has one switch template
-    - Switch template uses rules which are user defined and can be assigned to devices
-    - Rules in switch template define port profiles assigment to specific port or port ranges and other setting including additional cli commands
-    - Rules in switch templates can be matched to device beased on device model, name of device or user defined roles (e.g. spine, leaf, border)
-    - Rules provide much more depper granularity and flexibility in switch template configuration
-    - Provides centralized fabric management and cross-site coordination
-    - Examples: Campus networks, multi-building healthcare systems
 
-    Function: Get detailed EVPN topology information for a site or organization and topology ID.
-    - site_only_fabric = true is return , Site-Level Fabrics, use site_id,  /api/v1/sites/{site_id}/evpn_topologies/{topology_id}
-    - site_only_fabric = false is return, Multi Site Fabrics, use org_id,  /api/v1/orgs/{org_id}/evpn_topologies/{topology_id}
+    IMPORTANT: 
+    - site_only_fabric = true, Site-Level Fabrics, MUST use site_id,  /api/v1/sites/{site_id}/evpn_topologies/{topology_id}
+    - site_only_fabric = false, Multi Site Fabrics, MUST use org_id,  /api/v1/orgs/{org_id}/evpn_topologies/{topology_id}
 
 
     Accepts either site_id or org_id (one must be provided) along with topology_id.
@@ -144,7 +142,7 @@ EVPN_DETAILS_TOOL_DOC = """
     - /api/v1/sites/{site_id}/evpn_topologies/{topology_id}
     - /api/v1/orgs/{org_id}/evpn_topologies/{topology_id}
 
-    Summarizes:
+    Provides comprehensive EVPN fabric topology details including:
     - Number of pods
     - Number of switches
     - Fabric type  (edge/core/distribution, collapsed-core, bridged)
@@ -180,11 +178,8 @@ SITE_DEVICES_TOOL_DOC = """
     Use: Get actual device configurations after knowing what types exist
 
     Function: Get device configurations for a site by type with gateway template integration
-    API: GET /api/v1/sites/{site_id}/devices + GET /api/v1/orgs/{org_id}/gatewaytemplates
+    API: GET /api/v1/sites/{site_id}/devices + GET /api/v1/orgs/org_id/gatewaytemplates
     Parameters: site_id (required), device_type (optional, defaults to "ap")
-    WARNING: Without device_type, only returns APs. For all configs, call separately for each type.
-    Returns: Device configurations for specified type with enhanced gateway template data
-    Use: Get actual device configurations after knowing what types exist
 
     GATEWAY ENHANCED CONFIGURATION RETRIEVAL:
     When device_type="gateway" or when gateways are detected in the response:
@@ -214,9 +209,14 @@ SITE_DEVICES_TOOL_DOC = """
     - Enables proactive configuration management and compliance reporting
     - Supports bulk configuration validation across gateway fleet
 
+    RETURNS CONFIGURATION:
+    - Basic device configuration from /devices API
+    - additional_config_cmds use junos set syntax configuration not avaliable via MIST API
+    - additional_config_cmds lines starting with "set " are configuration elements, lines starting with "#" are comments or notes for user understanding, not applied configuration lines
+
     IMPORTANT: By default (when no device_type is specified), this function ONLY returns Access Points (APs).
     EFFICIENCY: Use inventory first only when discovering unknown device types,
-    For known device types, call get_site_devices directly with specific device_type
+    For known device types, call get_site_devices() directly with specific device_type
     Example: If you know site has only switches, call get_site_devices(site_id, "switch") directly 
 
 """     
@@ -456,14 +456,34 @@ GET_ORG_STATS_TOOL_DOC = """
               assets, devices, MX edges, and other infrastructure components with flexible 
               time range and filtering controls
     
-    API Used: Multiple Mist API endpoints based on stats_type parameter:
-    - GET /api/v1/orgs/{org_id}/stats (general organization statistics)
-    - GET /api/v1/orgs/{org_id}/stats/assets (asset tracking and management statistics)  
+    API ENDPOINTS - OPERATION SUPPORT MATRIX:
+    =========================================
+    Different endpoints support different operations. Pay close attention to allowed operations:
+
+    FULL SUPPORT (Direct GET + /search + /count):
+    - GET /api/v1/orgs/{org_id}/stats
+      * Direct: Returns minimal org info (org_id, msp_id, num_sites, num_devices)
+      * /search: Searchable org statistics
+      * /count: Count operations
+
+    STANDARD ENDPOINTS (Direct GET only):
+    - GET /api/v1/orgs/{org_id}/stats/assets (asset tracking and management statistics)
     - GET /api/v1/orgs/{org_id}/stats/devices (device-specific statistics across all device types)
-    - GET /api/v1/orgs/{org_id}/stats/mxedges (MX Edge statistics for SD-WAN and edge computing)
-    - GET /api/v1/orgs/{org_id}/stats/bgp_peers (BGP peering statistics for routing analysis)
     - GET /api/v1/orgs/{org_id}/stats/sites (site-level aggregated statistics)
-    - GET /api/v1/orgs/{org_id}/stats/clients (client connection and usage statistics)
+
+    RESTRICTED - SEARCH/COUNT ONLY (NO direct GET):
+    - GET /api/v1/orgs/{org_id}/stats/bgp_peers/(search|count) - BGP peering statistics
+    - GET /api/v1/orgs/{org_id}/stats/tunnels/(search|count) - AP to MX Edge tunnel statistics
+    - GET /api/v1/orgs/{org_id}/stats/vpn_peers/(search|count) - WAN Assurance VPN peer statistics
+    - GET /api/v1/orgs/{org_id}/stats/ports/(search|count) - Wired port statistics
+
+    RESTRICTED - ID-BASED ONLY (NO direct GET, requires mxedge_id):
+    - GET /api/v1/orgs/{org_id}/stats/mxedges/{mxedge_id} - Specific MX Edge statistics
+    - GET /api/v1/orgs/{org_id}/stats/mxedges - List all MX Edges (direct call supported)
+
+    SPECIAL ENDPOINTS:
+    - GET /api/v1/orgs/{org_id}/stats/otherdevices/{device_mac}/clients - 3rd party device clients
+
     
     Parameters:
     - org_id (str): Organization ID to retrieve statistics for (required)
@@ -476,11 +496,11 @@ GET_ORG_STATS_TOOL_DOC = """
     - end (int): End time as Unix timestamp (optional, used with start)
     - duration (str): Time period when start/end not specified (default: "1d")
                      Valid values: "1h", "1d", "1w", "1m"
-    - device_type (str): Filter by device type for device stats (ap, switch, gateway, mxedge)
+    - device_type (str): Filter by device type for device stats (ap, switch, gateway, mxedge,all), default ap for devices stats
     - site_id (str): Filter by specific site ID for scoped statistics
     
     Response Handling:
-    - Returns JSON with comprehensive organization metrics and statistics based on type
+    - Returns JSON with organization metrics and statistics based on type
     - Shows total counts, performance metrics, and time-series data for the specified type
     - Includes specialized metrics per stats type (assets: tracking/location, devices: health/performance)
     - Reports network performance statistics over specified time range
@@ -508,31 +528,190 @@ GET_ORG_STATS_TOOL_DOC = """
     - Enhanced error handling and fallback mechanisms
     
     Stats Type Descriptions:
-    - "general": Overall organization health, sites, devices, users, performance
+    - "general": Overall organization id,number of sites, number of devices does not contains health, sites, devices, users, performance or statistics metrics. Ignore num_devices_connected and num_devices_disconnected
     - "assets": Asset tracking, location services, asset management metrics
-    - "devices": Device health, performance, connectivity across all device types
-    - "mxedges": MX Edge specific stats for SD-WAN, tunnels, edge services
-    - "bgp_peers": BGP routing statistics, peer status, route advertisements
-    - "sites": Site-level aggregated statistics and performance metrics
-    - "clients": Wireless and wired client statistics, sessions, usage patterns
-    - "tunnels": VPN and overlay tunnel statistics, performance, availability
-    - "wireless": Wi-Fi specific statistics, RF performance, client experience
-    - "wired": Ethernet/switch statistics, port utilization, link performance
+    - "devices": Device health, performance, connectivity across device types, only if device_type=all, returns all device types statistics, else only device_type=ap
+    - "mxedges": MX Edge(Mist WIFI concentrator) specific stats, requires mxedge_id for specific edge stats
+    - "bgp_peers": BGP routing statistics, peer status, route advertisements (SEARCH/COUNT ONLY)
+    - "sites": Site-level aggregated statistics and performance metrics, number of devices connected/disconnected by type, rf template id, ap template id, gateway template id, switch template id, geografical latitude/longitude and address
+    - "tunnels": AP to MX edge tunnel statistics for Wifi traffic (SEARCH/COUNT ONLY)
+    - "vpn_peers": VPN peer statistics for WAN Assurance (SEARCH/COUNT ONLY - see details below)
+    - "ports": Wired port statistics at organization level (SEARCH/COUNT ONLY - see details below)
+
+    DETAILED PARAMETERS FOR RESTRICTED ENDPOINTS:
+    ==============================================
+
+    /vpn_peers Endpoint (SEARCH/COUNT ONLY):
+    ----------------------------------------
+    Endpoint: GET /api/v1/orgs/{org_id}/stats/vpn_peers/search
+             GET /api/v1/orgs/{org_id}/stats/vpn_peers/count
+
+    Required Parameters:
+      - org_id (str): Organization ID
+      - limit (int): Number of entries to return (default: 100, max: 1000)
+      - duration (str): Time period - "1h", "1d", "1w", "1m" (default: "1d")
+
+    Optional Filters:
+      - site_id (str): Filter by specific site
+      - peer_ip (str): Filter by VPN peer IP address
+      - peer_mac (str): Filter by peer MAC address
+      - start (int): Start time as Unix timestamp (overrides duration)
+      - end (int): End time as Unix timestamp (used with start)
+      - sort (str): Sort by field, use "-" prefix for descending (e.g., "sort=-site_id")
+
+    Example: /api/v1/orgs/{org_id}/stats/vpn_peers/search?limit=100&duration=1d&sort=-site_id
+
+
+    /ports Endpoint (SEARCH/COUNT ONLY):
+    ------------------------------------
+    Endpoint: GET /api/v1/orgs/{org_id}/stats/ports/search
+             GET /api/v1/orgs/{org_id}/stats/ports/count
+
+    Required Parameters:
+      - org_id (str): Organization ID
+      - limit (int): Number of entries to return (default: 100, max: 1000)
+      - duration (str): Time period - "1h", "1d", "1w", "1m" (default: "1d")
+
+    Optional Filters:
+      - site_id (str): Filter by specific site
+      - device_mac (str): Filter by device MAC address
+      - port_id (str): Filter by specific port identifier
+      - port_status (str): Filter by port status ("up", "down")
+      - type (str): Device type - "switch", "gateway", "all" (default: "all")
+      - full (bool): Include full optics information (default: false)
+      - start (int): Start time as Unix timestamp (overrides duration)
+      - end (int): End time as Unix timestamp (used with start)
+      - sort (str): Sort by field, use "-" prefix for descending (e.g., "sort=-site_id")
+
+    Returns: Detailed wired port statistics including:
+      - Port status, speed, duplex
+      - Traffic statistics (rx/tx bytes, packets)
+      - Errors and discards
+      - Optics information (if full=true): temperature, voltage, power levels
+      - PoE status and power draw
+      - LLDP neighbor information
+
+    Example: /api/v1/orgs/{org_id}/stats/ports/search?limit=100&duration=1d&type=switch&sort=-site_id&full=true
+
+
+    CRITICAL NOTES:
+    ---------------
+    - vpn_peers and ports endpoints will FAIL if called without /search or /count suffix
+    - bgp_peers and tunnels endpoints also require /search or /count suffix
+    - Always specify limit parameter to control response size in large deployments
+    - Use sort=-site_id to group results by site in descending order
+    - Duration parameter: use relative time ("1d") or absolute timestamps (start/end)
     
     Use Cases:
     - Comprehensive organization health monitoring with specialized focus areas
     - Asset management and tracking analysis for location-aware deployments
     - Device fleet management and performance optimization across device types
-    - SD-WAN and edge computing performance analysis via MX Edge stats
+    - Wifi MX Edge stats
     - Network routing analysis and BGP peer performance monitoring
     - Multi-site performance comparison and benchmarking
-    - Client experience analysis across wireless and wired infrastructure
-    - Capacity planning and resource allocation based on historical trends
-    - Performance trend analysis and reporting over custom time ranges
-    - Executive summary and KPI reporting with specific date ranges and focus
-    - Multi-organization comparison and benchmarking over time periods
-    - Compliance reporting with specific audit time windows
-    - Historical analysis for troubleshooting performance issues
+"""
+
+GET_ORG_TEMPLATES_DOC = """
+    ORGANIZATION TOOL #4: Template Configuration Manager
+    
+    Function: Retrieves organization-level templates for standardizing
+              configuration across sites (RF, Network, AP, Gateway templates)
+    
+    APIs Used:
+    - GET /api/v1/orgs/{org_id}/rftemplates (RF templates)
+    - GET /api/v1/orgs/{org_id}/networktemplates (Network templates)
+    - GET /api/v1/orgs/{org_id}/deviceprofiles (AP device profiles)
+    - GET /api/v1/orgs/{org_id}/gatewaytemplates (Gateway templates)
+    
+    Parameters:
+    - org_id (str): Organization ID to retrieve templates from
+    - template_type (str): Template type (rf/network/ap/gateway)
+    
+    Response Handling:
+    - Returns JSON array of templates of specified type
+    - Shows template names, IDs, and creation timestamps
+    - Contains template configuration parameters
+    - Reports sites using each template
+    - Includes modification history and versioning
+    - Shows validation status and compliance
+    
+    Network Template functions:
+    - Single switch templates can be assigned to multiple sites, but site can only have one switch template assigned to it
+    - Switch template uses rules to group common configuration elements for a user defined tag caled role (match_role) that is assigned to devices
+    - Rules in switch template define port profiles assigment to specific port or port ranges, In-band and Out-of-Band configuration, port mirroring and section for additional cli commands based on Juons syntax
+    - Rules in switch templates can be matched to device based on device model, name of device or user defined roles (e.g. spine, leaf, border)
+    - Rules provide granuality,flexibility and grouping in switch template configuration
+
+    Gateway Template functions:
+    - Gateway template can be assigned to multiple devices, but device can only have one gateway template assigned to it, that can be overriden at device level configuration
+    - Gateway templates define most of configuration for SD-WAN features, VPN settings, security policies and routing protocols and additional cli based on Junos syntax
+    - Gateway templates support static and dynamic routing protocols such as BGP and OSPF routing policies,policies for traffic steering, application QoS and security inspection
+    - Gateway templates can include settings for high availability, failover and load balancing
+
+    Enhanced Features:
+    - Template usage statistics across sites
+    - Configuration drift detection
+    - Template versioning and rollback support
+    - Compliance validation and reporting
+    - Template optimization recommendations
+    
+    Use Cases:
+    - Standardize configuration across multiple sites
+    - Template-based deployment and scaling
+    - Configuration management and version control
+    - Compliance enforcement and auditing
+    - Best practice propagation across organization
+
+"""
+
+GET_ORG_SETTING_DOC = """
+    ORGANIZATION TOOL #9: Organization Settings & Configuration Manager
+    
+    Function: Retrieves comprehensive organization-level settings and configurations
+              including security policies, feature enablement, session management,
+              and administrative preferences for centralized org management
+    
+    API Used: GET /api/v1/orgs/{org_id}/setting
+    
+    Parameters:
+    - org_id (str): Organization ID to retrieve settings from (required)
+    
+    Response Handling:
+    - Returns JSON with complete organization configuration settings
+    - Shows security and authentication settings (session expiry, password policies)
+    - Reports feature enablement status (analytics, engagement, AI features)
+    - Contains API access settings and rate limiting configurations
+    - Includes user management preferences and role-based access controls
+    - Shows integration settings for external systems and webhooks
+    - Reports compliance and audit settings for regulatory requirements
+    - Contains branding and customization preferences
+    
+    Enhanced Features:
+    - Security posture analysis with policy compliance reporting
+    - Feature adoption tracking and recommendations
+    - Integration health monitoring for connected systems
+    - Compliance validation against industry standards
+    - Setting change history and audit trail support
+    - Configuration drift detection compared to best practices
+    - Automated security hardening recommendations
+    - junos_shell_access is webhooks privilege per role     
+    
+    Use Cases:
+    - Organization security audit and compliance validation
+    - Feature enablement planning and optimization
+    - Integration configuration management and troubleshooting
+    - Security policy review and hardening assessment
+    - Administrative settings backup and documentation
+    - Compliance reporting for SOX, GDPR, HIPAA requirements
+    - Multi-organization configuration comparison and standardization
+    - Automated configuration drift detection and remediation planning
+    
+    Security Context:
+    - Provides visibility into organization security configurations
+    - Helps identify potential security gaps in settings
+    - Supports compliance audit trail requirements
+    - Enables proactive security posture managemen
+
 """
 
 SEARCH_ORG_WIRED_CLIENTS_DOC = """
@@ -1062,7 +1241,9 @@ def get_tool_documentation(tool_name: str) -> str:
             'execute_custom_shell_command': EXECUTE_CUSTOM_SHELL_COMMAND,
             'get_enhanced_device_info': GET_ENHANCED_DEVICE_INFO,
             'get_org_bgp_peers_enhanced': GET_BGP_PEERS_ENHANCED_DOC,
-            'get_org_stats_enhanced': GET_ORG_STATS_TOOL_DOC,
+            'get_organization_stats': GET_ORG_STATS_TOOL_DOC,
+            'get_organization_templates': GET_ORG_TEMPLATES_DOC,
+            'get_orgatinization_settings': GET_ORG_SETTING_DOC,
             'search_org_wired_clients': SEARCH_ORG_WIRED_CLIENTS_DOC,
             'search_org_nac_clients': SEARCH_ORG_NAC_CLIENTS_DOC,
             'search_org_wireless_clients': SEARCH_ORG_WIRELLESS_CLIENTS_DOC

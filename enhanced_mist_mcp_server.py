@@ -57,19 +57,19 @@ def safe_import_with_debug(module_name: str, description: str = ""):
         debug_stderr(f"Attempting to import {module_name} {description}")
         if module_name == "fastmcp":
             from fastmcp import FastMCP
-            debug_stderr(f"✓ Successfully imported {module_name}")
+            debug_stderr(f"✅ Successfully imported {module_name}")
             return FastMCP
         elif module_name == "httpx":
             import httpx
-            debug_stderr(f"✓ Successfully imported {module_name}")
+            debug_stderr(f"✅ Successfully imported {module_name}")
             return httpx
         elif module_name == "dotenv":
             from dotenv import load_dotenv
-            debug_stderr(f"✓ Successfully imported {module_name}")
+            debug_stderr(f"✅ Successfully imported {module_name}")
             return load_dotenv
         elif module_name == "websockets":
             import websockets
-            debug_stderr(f"✓ Successfully imported {module_name}")
+            debug_stderr(f"✅ Successfully imported {module_name}")
             return websockets, True
     except ImportError as e:
         debug_stderr(f"✗ Failed to import {module_name}: {e}")
@@ -104,7 +104,7 @@ class ServerConfig:
         try:
             load_dotenv = safe_import_with_debug("dotenv", "(environment variables)")
             load_dotenv()
-            debug_stderr("✓ Environment variables loaded")
+            debug_stderr("✅ Environment variables loaded")
         except Exception as e:
             debug_stderr(f"Warning: Could not load .env file: {e}")
         
@@ -114,7 +114,7 @@ class ServerConfig:
         if not api_token:
             debug_stderr("✗ MIST_API_TOKEN not found in environment")
             raise ValueError("MIST_API_TOKEN environment variable is required")
-        debug_stderr("✓ MIST_API_TOKEN found")
+        debug_stderr("✅ MIST_API_TOKEN found")
         
         # Determine base URL with proper precedence and validation
         debug_stderr("Determining base URL...")
@@ -138,7 +138,7 @@ class ServerConfig:
                 base_url = "https://api.mist.com"
                 debug_stderr(f"Using official Mist API URL: {base_url}")
         
-        debug_stderr(f"✓ Final base URL: {base_url}")
+        debug_stderr(f"✅ Final base URL: {base_url}")
         
         # Check WebSocket availability
         debug_stderr("Checking WebSocket support...")
@@ -147,7 +147,7 @@ class ServerConfig:
             websockets_available = websockets_result[1]
         else:
             websockets_available = True
-        debug_stderr(f"✓ WebSocket support: {websockets_available}")
+        debug_stderr(f"✅ WebSocket support: {websockets_available}")
         
         # Enhanced configuration options
         max_concurrent = int(os.getenv("MIST_MAX_CONCURRENT", "10"))
@@ -155,7 +155,7 @@ class ServerConfig:
         
         # MCP server name
         mcp_name = "comprehensive-secure-mist-mcp-server"
-        debug_stderr(f"✓ MCP name: {mcp_name}")
+        debug_stderr(f"✅ MCP name: {mcp_name}")
         
         config = cls(
             api_token=api_token,
@@ -189,7 +189,7 @@ try:
     # Initialize MCP
     debug_stderr("Initializing FastMCP instance...")
     mcp = FastMCP(name=CONFIG.mcp_name)
-    debug_stderr(f"✓ FastMCP instance created: {CONFIG.mcp_name}")
+    debug_stderr(f"✅ FastMCP instance created: {CONFIG.mcp_name}")
     
 except Exception as e:
     debug_stderr(f"FATAL: Startup failed: {e}")
@@ -525,7 +525,7 @@ class DiagnosticsCollector:
         self.performance_trends = defaultdict(list)
         self.api_endpoint_stats = defaultdict(lambda: {'count': 0, 'avg_duration': 0, 'success_rate': 0})
         self._last_update = time.time()
-        debug_stderr("✓ Enhanced DiagnosticsCollector initialized")
+        debug_stderr("✅ Enhanced DiagnosticsCollector initialized")
     
     def _update_system_metrics(self):
         """Update system-level metrics with enhanced tracking"""
@@ -664,7 +664,7 @@ class DiagnosticsCollector:
 try:
     debug_stderr("Creating enhanced global diagnostics collector...")
     diagnostics = DiagnosticsCollector()
-    debug_stderr("✓ Enhanced global diagnostics collector created")
+    debug_stderr("✅ Enhanced global diagnostics collector created")
 except Exception as e:
     debug_stderr(f"FATAL: Failed to create enhanced diagnostics collector: {e}")
     debug_stderr(f"Traceback: {traceback.format_exc()}")
@@ -779,10 +779,10 @@ def monitor_operation_enhanced(api_category: str = "unknown"):
         # Return appropriate wrapper based on function type
         try:
             if asyncio.iscoroutinefunction(func):
-                debug_stderr(f"✓ Enhanced async wrapper created for {func.__name__}")
+                debug_stderr(f"✅ Enhanced async wrapper created for {func.__name__}")
                 return async_wrapper
             else:
-                debug_stderr(f"✓ Enhanced sync wrapper created for {func.__name__}")
+                debug_stderr(f"✅ Enhanced sync wrapper created for {func.__name__}")
                 return sync_wrapper
         except Exception as e:
             debug_stderr(f"Error creating enhanced wrapper for {func.__name__}: {e}")
@@ -818,7 +818,7 @@ class JunosShellExecutor:
         self.api_client = api_client
         self.active_connections = set()
         self.connection_semaphore = asyncio.Semaphore(CONFIG.max_concurrent_requests)
-        debug_stderr("✓ Enhanced JunosShellExecutor initialized")
+        debug_stderr("✅ Enhanced JunosShellExecutor initialized")
     
     async def execute_command(self, site_id: str, device_id: str, command: str, 
                             max_runtime: int = 30, max_idle: int = 5, 
@@ -941,7 +941,7 @@ class JunosShellExecutor:
             if result.get("status") == "SUCCESS":
                 response_data = json.loads(result.get("response_data", "{}"))
                 url = response_data.get("url")
-                debug_stderr(f"✓ Shell URL received: {url[:50] if url else 'None'}...")
+                debug_stderr(f"✅ Shell URL received: {url[:50] if url else 'None'}...")
                 return url
             else:
                 debug_stderr(f"Shell URL request failed: {result}")
@@ -1052,7 +1052,7 @@ class JunosShellExecutor:
             await asyncio.gather(*cleanup_tasks, return_exceptions=True)
         
         self.active_connections.clear()
-        debug_stderr("################# ✓ Enhanced shell executor cleanup completed ################# ")
+        debug_stderr("################# ✅ Enhanced shell executor cleanup completed ################# ")
     
     async def _safe_close_connection(self, conn):
         """Safely close a WebSocket connection"""
@@ -1094,12 +1094,12 @@ class MistAPI:
                 ),
                 follow_redirects=True
             )
-            debug_stderr("✓ Enhanced HTTP client created")
+            debug_stderr("✅ Enhanced HTTP client created")
             
             # Create enhanced shell executor
             debug_stderr("Creating enhanced shell executor...")
             self.shell_executor = JunosShellExecutor(self)
-            debug_stderr("✓ Enhanced shell executor created")
+            debug_stderr("✅ Enhanced shell executor created")
             
         except Exception as e:
             debug_stderr(f"Error initializing Enhanced MistAPI: {e}")
@@ -1215,7 +1215,7 @@ class MistAPI:
         debug_stderr("Closing Enhanced MistAPI client...")
         await self.shell_executor.cleanup()
         await self.client.aclose()
-        debug_stderr(f"✓ Enhanced MistAPI client closed (processed {self.request_count} requests)")
+        debug_stderr(f"✅ Enhanced MistAPI client closed (processed {self.request_count} requests)")
 
 # Global enhanced API client
 api_client: Optional[MistAPI] = None
@@ -1227,13 +1227,13 @@ def get_api_client() -> MistAPI:
         if not api_client:
             debug_stderr("Creating new enhanced API client instance...")
             api_client = MistAPI(CONFIG)
-            debug_stderr("✓ Enhanced API client created successfully")
+            debug_stderr("✅ Enhanced API client created successfully")
         return api_client
     except Exception as e:
         debug_stderr(f" Error: Failed to get enhanced API client: {e}")
         raise
 
-debug_stderr("✓ Enhanced MistAPI class defined")
+debug_stderr("✅ Enhanced MistAPI class defined")
 
 # =============================================================================
 # DOCUMENTATION INITIALIZATION SYSTEM
@@ -1254,7 +1254,7 @@ def initialize_documentation():
         TOOL_DOCS['get_site_evpn_topologies'] = get_tool_documentation('get_site_evpn_topologies')
         TOOL_DOCS['get_evpn_topologies_details'] = get_tool_documentation('get_evpn_topologies_details')
         
-        debug_stderr(f"✓ Documentation initialized for {len(TOOL_DOCS)} tools")
+        debug_stderr(f"✅ Documentation initialized for {len(TOOL_DOCS)} tools")
         return True
         
     except Exception as e:
@@ -1734,7 +1734,7 @@ def safe_tool_definition(tool_name: str, api_category: str = "general"):
             monitored_func = monitor_operation_enhanced(api_category)(func)
             tool_func = mcp.tool()(monitored_func)
             
-            debug_stderr(f"✓ Enhanced tool '{tool_name}' defined successfully in category '{api_category}'")
+            debug_stderr(f"✅ Enhanced tool '{tool_name}' defined successfully in category '{api_category}'")
             return tool_func
             
         except Exception as e:
@@ -2211,7 +2211,7 @@ async def get_user_info() -> str:
             except json.JSONDecodeError:
                 result["message"] = "Retrieved user info but could not parse response"
         
-        debug_stderr("✓ Comprehensive get_user_info completed")
+        debug_stderr("✅ Comprehensive get_user_info completed")
         return json.dumps(result, indent=2)
     except Exception as e:
         debug_stderr(f"Comprehensive get_user_info failed: {e}")
@@ -2297,7 +2297,7 @@ async def get_audit_logs(org_id: str = None, site_id: str = None, limit: int = 1
             except json.JSONDecodeError:
                 result["message"] = "Retrieved logs but could not parse response"
         
-        debug_stderr("################# ✓ get_audit_logs completed ################# ")
+        debug_stderr("################# ✅ get_audit_logs completed ################# ")
         return json.dumps(result, indent=2)
     except Exception as e:
         debug_stderr(f"get_audit_logs failed: {e}")
@@ -2368,9 +2368,9 @@ async def get_organization(org_id: str) -> str:
                         "id": org.get("id"),
                         "name": org.get("name"),
                         "created_time": org.get("created_time"),
-                        "updated_time": org.get("updated_time"),
-                        "country_code": org.get("country_code"),
-                        "timezone": org.get("timezone"),
+                        "modified_time": org.get("updated_time"),
+                        "msp_name": org.get("msp_name"),
+                        "msp_id": org.get("msp_id"),
                         "session_expiry": org.get("session_expiry")
                     }
                     org_summary.append(summary)
@@ -2379,16 +2379,18 @@ async def get_organization(org_id: str) -> str:
             except json.JSONDecodeError:
                 result["message"] = "Retrieved organizations but could not parse response"
         
-        debug_stderr("################# ✓ Enhanced get_organizations completed ################# ")
+        debug_stderr("################# ✅ Enhanced get_organizations completed ################# ")
         return json.dumps(result, indent=2)
     except Exception as e:
         debug_stderr(f"Enhanced get_organizations failed: {e}")
         return json.dumps({"error": f" Error: Failed to get organizations: {str(e)}"}, indent=2)
 
 @safe_tool_definition("get_organization_stats", "organization")
-async def get_organization_stats(org_id: str, stats_type: str = "general", page: int = 1, limit: int = 100, 
-                               start: int = None, end: int = None, duration: str = "1d", 
-                               device_type: str = None, site_id: str = None) -> str:
+async def get_organization_stats(org_id: str, stats_type: str = "general", page: int = 1, limit: int = 100,
+                               start: int = None, end: int = None, duration: str = "1d",
+                               device_type: str = "all", site_id: str = None,
+                               port_id: str = None, port_status: str = None, full: bool = False,
+                               peer_ip: str = None, peer_mac: str = None, sort: str = None) -> str:
     f"""
     {get_tool_documentation("get_organization_stats")}
     """
@@ -2397,18 +2399,22 @@ async def get_organization_stats(org_id: str, stats_type: str = "general", page:
         client = get_api_client()
         
         # Map stats_type to appropriate endpoint
+        # NOTE: Some endpoints require /search or /count suffix - see endpoint_restrictions below
         endpoint_map = {
             "general": f"/api/v1/orgs/{org_id}/stats",
             "assets": f"/api/v1/orgs/{org_id}/stats/assets",
             "devices": f"/api/v1/orgs/{org_id}/stats/devices",
             "mxedges": f"/api/v1/orgs/{org_id}/stats/mxedges",
-            "bgp_peers": f"/api/v1/orgs/{org_id}/stats/bgp_peers",
             "sites": f"/api/v1/orgs/{org_id}/stats/sites",
-            "clients": f"/api/v1/orgs/{org_id}/stats/clients", 
-            "tunnels": f"/api/v1/orgs/{org_id}/stats/tunnels",
-            "wireless": f"/api/v1/orgs/{org_id}/stats/wireless",
-            "wired": f"/api/v1/orgs/{org_id}/stats/wired"
+            # Restricted endpoints - ONLY support /search and /count operations
+            "bgp_peers": f"/api/v1/orgs/{org_id}/stats/bgp_peers/search",
+            "tunnels": f"/api/v1/orgs/{org_id}/stats/tunnels/search",
+            "vpn_peers": f"/api/v1/orgs/{org_id}/stats/vpn_peers/search",
+            "ports": f"/api/v1/orgs/{org_id}/stats/ports/search"
         }
+
+        # Track which endpoints have operation restrictions
+        restricted_endpoints = ["bgp_peers", "tunnels", "vpn_peers", "ports"]
         
         # Validate stats_type
         if stats_type not in endpoint_map:
@@ -2416,16 +2422,19 @@ async def get_organization_stats(org_id: str, stats_type: str = "general", page:
                 "error": f"Invalid stats_type '{stats_type}'. Valid types: {list(endpoint_map.keys())}",
                 "valid_stats_types": list(endpoint_map.keys()),
                 "description": {
-                    "general": "Overall organization health and performance metrics",
-                    "assets": "Asset tracking and location services statistics", 
-                    "devices": "Device health and performance across all device types",
-                    "mxedges": "MX Edge SD-WAN and edge computing statistics",
-                    "bgp_peers": "BGP routing and peer performance statistics",
-                    "sites": "Site-level aggregated performance statistics",
-                    "clients": "Client connection and usage statistics",
-                    "tunnels": "VPN and overlay tunnel performance statistics", 
-                    "wireless": "Wi-Fi specific RF and client experience statistics",
-                    "wired": "Ethernet and switch port utilization statistics"
+                    "general": "Overall org info (org_id, msp_id, num_sites, num_devices) - supports direct GET, /search, /count",
+                    "assets": "Asset tracking and location services statistics - direct GET only",
+                    "devices": "Device health and performance across all device types - direct GET only",
+                    "mxedges": "MX Edge statistics - requires mxedge_id or list all - direct GET only",
+                    "sites": "Site-level aggregated performance statistics - direct GET only",
+                    "bgp_peers": "BGP routing and peer performance statistics - SEARCH/COUNT ONLY",
+                    "tunnels": "AP to MX Edge tunnel performance statistics - SEARCH/COUNT ONLY",
+                    "vpn_peers": "WAN Assurance VPN peer statistics - SEARCH/COUNT ONLY",
+                    "ports": "Wired port statistics with optics info - SEARCH/COUNT ONLY"
+                },
+                "endpoint_restrictions": {
+                    "search_count_only": restricted_endpoints,
+                    "note": "Endpoints marked SEARCH/COUNT ONLY require /search or /count suffix and will fail with direct GET"
                 }
             }, indent=2)
         
@@ -2436,7 +2445,7 @@ async def get_organization_stats(org_id: str, stats_type: str = "general", page:
             "page": page,
             "limit": min(max(1, limit), 1000)  # Enforce limits
         }
-        
+
         # Handle time range parameters - start/end takes precedence over duration
         if start is not None and end is not None:
             params["start"] = start
@@ -2445,13 +2454,38 @@ async def get_organization_stats(org_id: str, stats_type: str = "general", page:
         else:
             params["duration"] = duration
             debug_stderr(f"Using relative duration: {duration}")
-        
+
         # Add optional filtering parameters
         if device_type and stats_type in ["devices", "general"]:
             params["type"] = device_type
-        
+        else:
+            params["type"] = "all"
+
         if site_id:
             params["site_id"] = site_id
+
+        # Add sort parameter if provided (commonly used: sort=-site_id)
+        if sort:
+            params["sort"] = sort
+            debug_stderr(f"Using sort parameter: {sort}")
+
+        # Port-specific parameters (for stats_type="ports")
+        if stats_type == "ports":
+            if port_id:
+                params["port_id"] = port_id
+            if port_status:
+                params["port_status"] = port_status
+            if full:
+                params["full"] = "true" if full else "false"
+            debug_stderr(f"Port filters: port_id={port_id}, port_status={port_status}, full={full}")
+
+        # VPN peer-specific parameters (for stats_type="vpn_peers")
+        if stats_type == "vpn_peers":
+            if peer_ip:
+                params["peer_ip"] = peer_ip
+            if peer_mac:
+                params["peer_mac"] = peer_mac
+            debug_stderr(f"VPN peer filters: peer_ip={peer_ip}, peer_mac={peer_mac}")
             
         debug_stderr(f"Making request to endpoint: {endpoint} with params: {params}")
         result = await client.make_request(endpoint, params=params)
@@ -2466,6 +2500,7 @@ async def get_organization_stats(org_id: str, stats_type: str = "general", page:
                 # Enhanced time range reporting
                 result["query_parameters"] = {
                     "stats_type": stats_type,
+                    "endpoint_restriction": "SEARCH/COUNT ONLY" if stats_type in restricted_endpoints else "Direct GET supported",
                     "time_range_method": "absolute" if (start and end) else "relative",
                     "start_timestamp": start,
                     "end_timestamp": end,
@@ -2473,7 +2508,17 @@ async def get_organization_stats(org_id: str, stats_type: str = "general", page:
                     "page": page,
                     "limit": limit,
                     "device_type_filter": device_type,
-                    "site_filter": site_id
+                    "site_filter": site_id,
+                    "sort": sort,
+                    "port_filters": {
+                        "port_id": port_id,
+                        "port_status": port_status,
+                        "full_optics": full
+                    } if stats_type == "ports" else None,
+                    "vpn_peer_filters": {
+                        "peer_ip": peer_ip,
+                        "peer_mac": peer_mac
+                    } if stats_type == "vpn_peers" else None
                 }
                 
                 # Stats-type specific processing and analysis
@@ -2569,35 +2614,98 @@ async def get_organization_stats(org_id: str, stats_type: str = "general", page:
                                     mxedge_analysis["tunnel_stats"]["down"] += 1
                         
                         result["mxedge_analysis"] = mxedge_analysis
-                
-                elif stats_type == "clients":
-                    # Client-specific analysis
-                    if isinstance(stats_data, list):
-                        client_analysis = {
-                            "total_clients": len(stats_data),
-                            "by_type": {"wireless": 0, "wired": 0},
-                            "by_band": {},
-                            "authenticated": 0,
-                            "guest": 0
+
+                elif stats_type == "ports":
+                    # Port statistics analysis
+                    if isinstance(stats_data, dict) and "results" in stats_data:
+                        port_list = stats_data.get("results", [])
+                    elif isinstance(stats_data, list):
+                        port_list = stats_data
+                    else:
+                        port_list = []
+
+                    if port_list:
+                        port_analysis = {
+                            "total_ports": len(port_list),
+                            "by_status": {"up": 0, "down": 0, "unknown": 0},
+                            "by_device_type": {},
+                            "by_speed": {},
+                            "poe_enabled": 0,
+                            "with_lldp": 0,
+                            "with_errors": 0
                         }
-                        
-                        for client in stats_data:
-                            # Type analysis
-                            if client.get("ap"):
-                                client_analysis["by_type"]["wireless"] += 1
-                                band = client.get("band", "unknown")
-                                client_analysis["by_band"][band] = client_analysis["by_band"].get(band, 0) + 1
+
+                        for port in port_list:
+                            # Status analysis
+                            port_status = port.get("port_status", "unknown")
+                            if port_status in port_analysis["by_status"]:
+                                port_analysis["by_status"][port_status] += 1
                             else:
-                                client_analysis["by_type"]["wired"] += 1
-                            
-                            # Auth analysis
-                            if client.get("username") or client.get("psk_name"):
-                                client_analysis["authenticated"] += 1
+                                port_analysis["by_status"]["unknown"] += 1
+
+                            # Device type
+                            device_type = port.get("type", "unknown")
+                            port_analysis["by_device_type"][device_type] = port_analysis["by_device_type"].get(device_type, 0) + 1
+
+                            # Speed analysis
+                            speed = port.get("speed", "unknown")
+                            port_analysis["by_speed"][str(speed)] = port_analysis["by_speed"].get(str(speed), 0) + 1
+
+                            # PoE detection
+                            if port.get("poe_enabled") or port.get("poe_on"):
+                                port_analysis["poe_enabled"] += 1
+
+                            # LLDP neighbor detection
+                            if port.get("lldp_neighbor"):
+                                port_analysis["with_lldp"] += 1
+
+                            # Error detection
+                            if port.get("rx_errors", 0) > 0 or port.get("tx_errors", 0) > 0:
+                                port_analysis["with_errors"] += 1
+
+                        result["port_analysis"] = port_analysis
+
+                elif stats_type == "vpn_peers":
+                    # VPN peer statistics analysis
+                    if isinstance(stats_data, dict) and "results" in stats_data:
+                        peer_list = stats_data.get("results", [])
+                    elif isinstance(stats_data, list):
+                        peer_list = stats_data
+                    else:
+                        peer_list = []
+
+                    if peer_list:
+                        vpn_analysis = {
+                            "total_peers": len(peer_list),
+                            "by_status": {"up": 0, "down": 0, "unknown": 0},
+                            "by_site": {},
+                            "total_sessions": 0,
+                            "total_bandwidth_rx": 0,
+                            "total_bandwidth_tx": 0
+                        }
+
+                        for peer in peer_list:
+                            # Status analysis
+                            peer_status = peer.get("status", "unknown")
+                            if peer_status in vpn_analysis["by_status"]:
+                                vpn_analysis["by_status"][peer_status] += 1
                             else:
-                                client_analysis["guest"] += 1
-                        
-                        result["client_analysis"] = client_analysis
-                
+                                vpn_analysis["by_status"]["unknown"] += 1
+
+                            # Site distribution
+                            site_id = peer.get("site_id", "unknown")
+                            vpn_analysis["by_site"][site_id] = vpn_analysis["by_site"].get(site_id, 0) + 1
+
+                            # Session count
+                            sessions = peer.get("num_sessions", 0)
+                            vpn_analysis["total_sessions"] += sessions
+
+                            # Bandwidth tracking
+                            vpn_analysis["total_bandwidth_rx"] += peer.get("rx_bytes", 0)
+                            vpn_analysis["total_bandwidth_tx"] += peer.get("tx_bytes", 0)
+
+                        result["vpn_peer_analysis"] = vpn_analysis
+               
                 # SLE performance summary (applicable to most stats types)
                 sle_data = stats_data.get("sle", [])
                 if sle_data:
@@ -2911,20 +3019,25 @@ async def get_org_bgp_peers_enhanced(
         }, indent=2)
     
 @safe_tool_definition("get_org_inventory", "organization")
-async def get_org_inventory(org_id: str, device_type: str = None) -> str:
+async def get_org_inventory(org_id: str, device_type: str = None, page: int = 1, limit: int = 1000) -> str:
     """
     Function: Get organization device inventory with optional device type filtering
     API: GET /api/v1/orgs/{org_id}/inventory
-    Parameters: org_id (required), device_type (optional: ap/switch/gateway)
-    Returns: Device list with models, MACs, deployment status, site assignments
-    Use: Discover what device types exist before making config calls
+    Parameters: org_id (required), device_type (optional: ap/switch/gateway) or, vc=(true/false)
+                page (optional, default=1), limit (optional, default=1000, 
+    Returns: Device list with models, MACs, deployment status, site assignments and precize number of connected devices in entire org
+    Use: Discover what device types exist before making further API calls, inventory audits, device lifecycle management
     """
     try:
         debug_stderr(f"Executing get_org_inventory for org {org_id}...")
         client = get_api_client()
         endpoint = f"/api/v1/orgs/{org_id}/inventory"
         
-        params = {}
+        # Build query parameters based on provided inputs
+        params = {
+            "page": page,
+            "limit": min(max(1, limit), 1000)  # Enforce limits
+        }
         if device_type:
             params["type"] = device_type
         
@@ -2948,7 +3061,7 @@ async def get_org_inventory(org_id: str, device_type: str = None) -> str:
             except json.JSONDecodeError:
                 result["message"] = "Retrieved inventory but could not parse response"
         
-        debug_stderr("################# ✓ get_org_inventory completed ################# ")
+        debug_stderr("################# ✅ get_org_inventory completed ################# ")
         return json.dumps(result, indent=2)
     except Exception as e:
         debug_stderr(f"get_org_inventory failed: {e}")
@@ -3012,7 +3125,7 @@ async def get_org_sites(org_id: str) -> str:
             except json.JSONDecodeError:
                 result["message"] = "Retrieved sites but could not parse response"
         
-        debug_stderr("################# ✓ Enhanced get_org_sites completed ################# ")
+        debug_stderr("################# ✅ Enhanced get_org_sites completed ################# ")
         return json.dumps(result, indent=2)
     except Exception as e:
         debug_stderr(f"Enhanced get_org_sites failed: {e}")
@@ -3020,43 +3133,8 @@ async def get_org_sites(org_id: str) -> str:
 
 @safe_tool_definition("get_org_templates", "organization")
 async def get_org_templates(org_id: str, template_type: str = "rf") -> str:
-    """
-    ORGANIZATION TOOL #4: Template Configuration Manager
-    
-    Function: Retrieves organization-level templates for standardizing
-              configuration across sites (RF, Network, AP, Gateway templates)
-    
-    APIs Used:
-    - GET /api/v1/orgs/{org_id}/rftemplates (RF templates)
-    - GET /api/v1/orgs/{org_id}/networktemplates (Network templates)
-    - GET /api/v1/orgs/{org_id}/deviceprofiles (AP device profiles)
-    - GET /api/v1/orgs/{org_id}/gatewaytemplates (Gateway templates)
-    
-    Parameters:
-    - org_id (str): Organization ID to retrieve templates from
-    - template_type (str): Template type (rf/network/ap/gateway)
-    
-    Response Handling:
-    - Returns JSON array of templates of specified type
-    - Shows template names, IDs, and creation timestamps
-    - Contains template configuration parameters
-    - Reports sites using each template
-    - Includes modification history and versioning
-    - Shows validation status and compliance
-    
-    Enhanced Features:
-    - Template usage statistics across sites
-    - Configuration drift detection
-    - Template versioning and rollback support
-    - Compliance validation and reporting
-    - Template optimization recommendations
-    
-    Use Cases:
-    - Standardize configuration across multiple sites
-    - Template-based deployment and scaling
-    - Configuration management and version control
-    - Compliance enforcement and auditing
-    - Best practice propagation across organization
+    f"""
+    {get_tool_doc('get_org_templates')}
     """
     try:
         debug_stderr(f"Executing get_org_templates for org {org_id}, type {template_type}...")
@@ -3098,7 +3176,7 @@ async def get_org_templates(org_id: str, template_type: str = "rf") -> str:
             except json.JSONDecodeError:
                 result["message"] = "Retrieved templates but could not parse response"
         
-        debug_stderr("################# ✓ get_org_templates completed ################# ")
+        debug_stderr("################# ✅ ✅get_org_templates completed ################# ")
         return json.dumps(result, indent=2)
     except Exception as e:
         debug_stderr(f"get_org_templates failed: {e}")
@@ -3106,53 +3184,8 @@ async def get_org_templates(org_id: str, template_type: str = "rf") -> str:
 
 @safe_tool_definition("get_org_settings", "organization")
 async def get_org_settings(org_id: str) -> str:
-    """
-    ORGANIZATION TOOL #9: Organization Settings & Configuration Manager
-    
-    Function: Retrieves comprehensive organization-level settings and configurations
-              including security policies, feature enablement, session management,
-              and administrative preferences for centralized org management
-    
-    API Used: GET /api/v1/orgs/{org_id}/setting
-    
-    Parameters:
-    - org_id (str): Organization ID to retrieve settings from (required)
-    
-    Response Handling:
-    - Returns JSON with complete organization configuration settings
-    - Shows security and authentication settings (session expiry, password policies)
-    - Reports feature enablement status (analytics, engagement, AI features)
-    - Contains API access settings and rate limiting configurations
-    - Includes user management preferences and role-based access controls
-    - Shows integration settings for external systems and webhooks
-    - Reports compliance and audit settings for regulatory requirements
-    - Contains branding and customization preferences
-    
-    Enhanced Features:
-    - Security posture analysis with policy compliance reporting
-    - Feature adoption tracking and recommendations
-    - Integration health monitoring for connected systems
-    - Compliance validation against industry standards
-    - Setting change history and audit trail support
-    - Configuration drift detection compared to best practices
-    - Automated security hardening recommendations
-    - junos_shell_access is webhooks privilege per role     
-    
-    Use Cases:
-    - Organization security audit and compliance validation
-    - Feature enablement planning and optimization
-    - Integration configuration management and troubleshooting
-    - Security policy review and hardening assessment
-    - Administrative settings backup and documentation
-    - Compliance reporting for SOX, GDPR, HIPAA requirements
-    - Multi-organization configuration comparison and standardization
-    - Automated configuration drift detection and remediation planning
-    
-    Security Context:
-    - Provides visibility into organization security configurations
-    - Helps identify potential security gaps in settings
-    - Supports compliance audit trail requirements
-    - Enables proactive security posture management
+    f"""
+    {get_tool_doc('get_org_settings')}
     """
     try:
         debug_stderr(f"Executing get_org_settings for org {org_id}...")
@@ -3250,7 +3283,7 @@ async def get_org_settings(org_id: str) -> str:
             except json.JSONDecodeError:
                 result["message"] = "Retrieved org settings but could not parse response"
         
-        debug_stderr("################# ✓ get_org_settings completed ################# ")
+        debug_stderr("################# ✅ get_org_settings completed ################# ")
         return json.dumps(result, indent=2)
     except Exception as e:
         debug_stderr(f"get_org_settings failed: {e}")
@@ -3284,7 +3317,7 @@ async def search_org_devices(org_id: str, query: str, limit: int = 50) -> str:
             except json.JSONDecodeError:
                 result["message"] = "Retrieved inventory but could not parse response"
         
-        debug_stderr("################# ✓ search_org_devices completed ################# ")
+        debug_stderr("################# ✅ search_org_devices completed ################# ")
         return json.dumps(result, indent=2)
     except Exception as e:
         debug_stderr(f"search_org_devices failed: {e}")
@@ -3363,7 +3396,7 @@ async def get_org_networks(org_id: str) -> str:
             except json.JSONDecodeError:
                 result["message"] = "Retrieved networks but could not parse response"
         
-        debug_stderr("################# ✓ Enhanced get_org_networks completed ################# ")
+        debug_stderr("################# ✅ Enhanced get_org_networks completed ################# ")
         return json.dumps(result, indent=2)
     except Exception as e:
         debug_stderr(f"Enhanced get_org_networks failed: {e}")
@@ -3420,7 +3453,7 @@ async def get_org_wlans(org_id: str) -> str:
             except json.JSONDecodeError:
                 result["message"] = "Retrieved WLANs but could not parse response"
         
-        debug_stderr("################# ✓ Enhanced get_org_wlans completed ")
+        debug_stderr("################# ✅ Enhanced get_org_wlans completed ")
         return json.dumps(result, indent=2)
     except Exception as e:
         debug_stderr(f"Enhanced get_org_wlans failed: {e}")
@@ -3444,7 +3477,7 @@ async def count_org_nac_clients(org_id: str) -> str:
             except json.JSONDecodeError:
                 result["message"] = "Retrieved NAC client count but could not parse response"
         
-        debug_stderr("################# ✓ count_org_nac_clients completed ################# ")
+        debug_stderr("################# ✅ count_org_nac_clients completed ################# ")
         return json.dumps(result, indent=2)
     except Exception as e:
         debug_stderr(f"count_org_nac_clients failed: {e}")
@@ -3491,7 +3524,7 @@ async def get_site_info(site_id: str) -> str:
             except json.JSONDecodeError:
                 result["message"] = "Retrieved site info but could not parse response"
         
-        debug_stderr("################# ✓ get_site_info completed ################# ")
+        debug_stderr("################# ✅ get_site_info completed ################# ")
         return json.dumps(result, indent=2)
     except Exception as e:
         debug_stderr(f"get_site_info failed: {e}")
@@ -3500,69 +3533,10 @@ async def get_site_info(site_id: str) -> str:
 @safe_tool_definition("get_site_devices", "site")
 async def get_site_devices(site_id: str, device_type: str = None) -> str:
     f"""
-    Function: Get device configurations for a site by type
-    CRITICAL DECISION TREE - READ CAREFULLY:
-    ┌─ Do you KNOW the exact device types present at this site? ─┐
-    │                                                            │
-    ├─ YES (user specified OR previously discovered)             │
-    │  └─ Use get_site_devices(site_id, device_type) directly    │
-    │                                                            │
-    └─ NO (unknown site OR user didn't specify device types)     │
-        └─ MANDATORY: Use get_org_inventory() FIRST              │
-            └─ Then call get_site_devices() for each discovered type    
-
-    API: GET /api/v1/sites/{site_id}/devices
-
-    Parameters: site_id (required), device_type (optional, defaults to "ap")
-    WARNING: Without device_type, only returns APs. For all configs, call separately for each type.
-    Returns: Device configurations for specified type only
-    Use: Get actual device configurations after knowing what types exist
-
-    Function: Get device configurations for a site by type with gateway template integration
-    API: GET /api/v1/sites/{site_id}/devices + GET /api/v1/orgs/{org_id}/gatewaytemplates
-    Parameters: site_id (required), device_type (optional, defaults to "ap")
-    WARNING: Without device_type, only returns APs. For all configs, call separately for each type.
-    Returns: Device configurations for specified type with enhanced gateway template data
-    Use: Get actual device configurations after knowing what types exist
-
-    GATEWAY ENHANCED CONFIGURATION RETRIEVAL:
-    When device_type="gateway" or when gateways are detected in the response:
-    - Automatically retrieves organization gateway templates via get_org_templates(org_id,gatewaytemplates)
-    - Matches gateway devices to their assigned gateway template using gatewaytemplate_id
-    - Supplements basic gateway device config with full template configuration including:
-    * Complete interface configurations
-    * Routing policies and protocols (BGP, OSPF, static routes)
-    * Security zones and policies
-    * NAT and firewall rules
-    * VPN tunnel configurations
-    * WAN edge and SD-WAN policies
-    * DHCP and DNS configurations
-    - Provides template vs device configuration comparison for drift detection
-    - Returns merged configuration showing both Mist-managed settings and template-defined config
-    - Enables bulk configuration analysis without individual shell command delays
-
-    TEMPLATE MATCHING LOGIC:
-    - Uses gatewaytemplate_id from device configuration
-    - Falls back to site-level gatewaytemplate_id if device-level not specified
-    - Handles cases where gateways use organization default templates
-    - Provides template inheritance hierarchy information
-
-    CONFIGURATION DRIFT DETECTION:
-    - Compares template-defined configuration with device-reported configuration
-    - Identifies deviations between intended (template) and actual (device) state
-    - Enables proactive configuration management and compliance reporting
-    - Supports bulk configuration validation across gateway fleet
-
-    IMPORTANT: By default (when no device_type is specified), this function ONLY returns Access Points (APs).
-    EFFICIENCY: Use inventory first only when discovering unknown device types,
-    For known device types, call get_site_devices directly with specific device_type
-    Example: If you know site has only switches, call get_site_devices(site_id, "switch") directly 
-
-    See also:
     {get_tool_doc('get_site_devices')}
     """
-    #doc = get_tool_doc('get_site_devices')
-    #debug_stderr(f"Tool documentation: {doc[:1000]}...")
+    doc = get_tool_doc('get_site_devices')
+    debug_stderr(f"Tool documentation: {doc[:1000]}...")
     try:
         debug_stderr(f"#################  Executing get_site_devices for site {site_id}... ################# ")
         client = get_api_client()
@@ -3679,7 +3653,7 @@ async def get_site_devices(site_id: str, device_type: str = None) -> str:
             except json.JSONDecodeError:
                 result["message"] = "Retrieved devices but could not parse response"
         
-        debug_stderr("################# ✓ get_site_devices completed ################# ")
+        debug_stderr("################# ✅ get_site_devices completed ################# ")
         return json.dumps(result, indent=2)
     except Exception as e:
         debug_stderr(f"get_site_devices failed: {e}")
@@ -3738,7 +3712,7 @@ async def get_site_wlans(site_id: str) -> str:
             except json.JSONDecodeError:
                 result["message"] = "Retrieved WLANs but could not parse response"
         
-        debug_stderr("################# ✓ get_site_wlans completed ################# ")
+        debug_stderr("################# ✅ get_site_wlans completed ################# ")
         return json.dumps(result, indent=2)
     except Exception as e:
         debug_stderr(f"get_site_wlans failed: {e}")
@@ -3770,7 +3744,7 @@ async def get_site_stats(site_id: str, metric: str = None) -> str:
             except json.JSONDecodeError:
                 result["message"] = "Retrieved site stats but could not parse response"
         
-        debug_stderr("################# ✓ get_site_stats completed ################# ")
+        debug_stderr("################# ✅ get_site_stats completed ################# ")
         return json.dumps(result, indent=2)
     except Exception as e:
         debug_stderr(f"get_site_stats failed: {e}")
@@ -3802,12 +3776,48 @@ async def get_site_insights(site_id: str, metric: str = None) -> str:
             except json.JSONDecodeError:
                 result["message"] = "Retrieved site insights but could not parse response"
         
-        debug_stderr("################# ✓ get_site_insights completed ################# ")
+        debug_stderr("################# ✅ get_site_insights completed ################# ")
         return json.dumps(result, indent=2)
     except Exception as e:
         debug_stderr(f"get_site_insights failed: {e}")
         return json.dumps({"error": f" Error: Failed to get site insights: {str(e)}"}, indent=2)
 
+@safe_tool_definition("get_site_settings", "site")
+async def get_site_settings(site_id: str) -> str:
+    """
+    Get site settings and configuration details
+    Site settings refer to the configuration and management of of site within a Mist Organization.
+
+    These settings include access point settings, firmware upgrade schedules, and various features such as location services, occupancy analytics, and engagement analytics.
+
+    GET /api/v1/sites/{site_id}/setting/derived
+    Get the Derived Site Settings, generated by merging the Org level templates (network templates, gateway templates) and the Site level configuration. 
+    If the same parameter is defined in both scopes, the Site level one is used. 
+    In addition, the Zoom and Teams accounts are also merged into the derived settings.
+    
+    """
+    try:
+        debug_stderr(f"Executing get_site_settings for site {site_id}...")
+        client = get_api_client()
+        endpoint = f"/api/v1/sites/{site_id}/setting/derived"
+              
+        result = await client.make_request(endpoint)
+        
+        if result.get("status") == "SUCCESS":
+            try:
+                settings_data = json.loads(result.get("response_data", "{}"))
+                result["site_settings"] = settings_data
+                result["message"] = f"Retrieved site settings for {site_id}"
+                
+                
+            except json.JSONDecodeError:
+                result["message"] = "Retrieved site settings but could not parse response"
+        
+        debug_stderr("################# ✅ get_site_settings completed ################# ")
+        return json.dumps(result, indent=2)
+    except Exception as e:
+        debug_stderr(f"get_site_settings failed: {e}")
+        return json.dumps({"error": f" Error: Failed to get site settings: {str(e)}"}, indent=2)
 
 # DEVICE MANAGEMENT & STATISTICS FUNCTIONS
 
@@ -3862,7 +3872,7 @@ async def get_device_stats(site_id: str, device_id: str = None, metric: str = No
             try:
                 stats_data = json.loads(result.get("response_data", "{}"))
                 result["device_stats"] = stats_data
-                result["message"] = f"################# ✓ Retrieved device statistics #################"
+                result["message"] = f"################# ✅ Retrieved device statistics #################"
                 
                 if device_id:
                     result["device_id"] = device_id
@@ -3872,7 +3882,7 @@ async def get_device_stats(site_id: str, device_id: str = None, metric: str = No
             except json.JSONDecodeError:
                 result["message"] = "Retrieved device stats but could not parse response"
         
-        debug_stderr("✓ get_device_stats completed")
+        debug_stderr("✅ get_device_stats completed")
         return json.dumps(result, indent=2)
     except Exception as e:
         debug_stderr(f"get_device_stats failed: {e}")
@@ -3900,7 +3910,7 @@ async def device_action(site_id: str, device_id: str, action: str, action_params
             except json.JSONDecodeError:
                 result["message"] = f"Action '{action}' executed but could not parse response"
         
-        debug_stderr("✓ device_action completed")
+        debug_stderr("✅ device_action completed")
         return json.dumps(result, indent=2)
     except Exception as e:
         debug_stderr(f"device_action failed: {e}")
@@ -3938,7 +3948,7 @@ async def execute_custom_shell_command(site_id: str, device_id: str, command: st
             "max_output_size": result.max_output_size
         }
         
-        debug_stderr("################# ✓ Enhanced execute_custom_shell_command completed")
+        debug_stderr("################# ✅ Enhanced execute_custom_shell_command completed")
         return json.dumps(result_dict, indent=2)
         
     except Exception as e:
@@ -3999,7 +4009,7 @@ async def get_enhanced_device_info(site_id: str, device_id: str) -> str:
             
             result["shell_data"] = shell_results
         
-        debug_stderr("✓ Enhanced get_enhanced_device_info completed")
+        debug_stderr("✅ Enhanced get_enhanced_device_info completed")
         return json.dumps(result, indent=2)
         
     except Exception as e:
@@ -4083,7 +4093,7 @@ async def get_device_events(site_id: str, event_type: str = None, start: int = N
             except Exception as e:
                 result["message"] = f"Retrieved events but could not parse response: {e}"
         
-        debug_stderr("################# ✓ get_device_events completed ################# ")
+        debug_stderr("################# ✅ get_device_events completed ################# ")
         return json.dumps(result, indent=2)
     except Exception as e:
         debug_stderr(f"get_device_events failed: {e}")
@@ -4174,7 +4184,7 @@ async def get_alarms(org_id: str = None, site_id: str = None, severity: str = No
             except json.JSONDecodeError:
                 result["message"] = "Retrieved alarms but could not parse response"
         
-        debug_stderr("################# ✓ get_alarms completed ################# ")
+        debug_stderr("################# ✅ get_alarms completed ################# ")
         return json.dumps(result, indent=2)
     except Exception as e:
         debug_stderr(f"get_alarms failed: {e}")
@@ -4204,7 +4214,7 @@ async def get_msp_info(msp_id: str) -> str:
             except json.JSONDecodeError:
                 result["message"] = "Retrieved MSP info but could not parse response"
         
-        debug_stderr("################# ✓ get_msp_info completed ################# ")
+        debug_stderr("################# ✅ get_msp_info completed ################# ")
         return json.dumps(result, indent=2)
     except Exception as e:
         debug_stderr(f"get_msp_info failed: {e}")
@@ -4240,7 +4250,7 @@ async def get_msp_orgs(msp_id: str) -> str:
             except json.JSONDecodeError:
                 result["message"] = "Retrieved MSP orgs but could not parse response"
         
-        debug_stderr("################# ✓ get_msp_orgs completed ################# ")
+        debug_stderr("################# ✅ get_msp_orgs completed ################# ")
         return json.dumps(result, indent=2)
     except Exception as e:
         debug_stderr(f"get_msp_orgs failed: {e}")
@@ -4342,7 +4352,7 @@ async def make_mist_api_call(endpoint: str, method: str = "GET", org_id: str = N
             "strict_mode_active": security_analyzer.strict_mode
         }
         
-        debug_stderr("################# ✓ Enhanced make_mist_api_call completed ################# ")
+        debug_stderr("################# ✅ Enhanced make_mist_api_call completed ################# ")
         return json.dumps(result, indent=2)
     except Exception as e:
         debug_stderr(f"Enhanced make_mist_api_call failed: {e}")
@@ -4418,7 +4428,7 @@ def get_service_health_report() -> str:
             }
         }, indent=2)
         
-        debug_stderr("✓ Comprehensive get_service_health_report completed")
+        debug_stderr("✅ Comprehensive get_service_health_report completed")
         return result
     except Exception as e:
         debug_stderr(f"get_service_health_report failed: {e}")
@@ -4501,7 +4511,7 @@ async def test_mist_connectivity() -> str:
                     "rate_limit_remaining": result.get("rate_limit_remaining"),
                     "response_size": result.get("response_size", 0)
                 }
-                debug_stderr(f"✓ Endpoint {endpoint} test completed in {response_time:.2f}s")
+                debug_stderr(f"✅ Endpoint {endpoint} test completed in {response_time:.2f}s")
                 
             except asyncio.TimeoutError:
                 debug_stderr(f"✗ Endpoint {endpoint} timed out")
@@ -4543,7 +4553,7 @@ async def test_mist_connectivity() -> str:
             "detailed_results": results
         }
         
-        debug_stderr("################# ✓ Comprehensive test_mist_connectivity completed ################# ")
+        debug_stderr("################# ✅ Comprehensive test_mist_connectivity completed ################# ")
         return json.dumps(connectivity_result, indent=2)
     except Exception as e:
         debug_stderr(f"test_mist_connectivity failed: {e}")
@@ -4652,7 +4662,7 @@ def debug_server_status() -> str:
             }
         }
         
-        debug_stderr("✓ Comprehensive debug_server_status completed")
+        debug_stderr("✅ Comprehensive debug_server_status completed")
         return json.dumps(status, indent=2)
     except Exception as e:
         debug_stderr(f"debug_server_status failed: {e}")
@@ -4729,7 +4739,7 @@ def export_diagnostics_json() -> str:
             "error_patterns": dict(diagnostics.error_patterns)
         }
         
-        debug_stderr("✓ Comprehensive export_diagnostics_json completed")
+        debug_stderr("✅ Comprehensive export_diagnostics_json completed")
         return json.dumps(diagnostic_data, indent=2)
     except Exception as e:
         debug_stderr(f"export_diagnostics_json failed: {e}")
@@ -4859,13 +4869,12 @@ def get_performance_trends(hours: int = 24) -> str:
             }
         }
         
-        debug_stderr("✓ Enhanced get_performance_trends completed")
+        debug_stderr("✅ Enhanced get_performance_trends completed")
         return json.dumps(trends_data, indent=2)
     except Exception as e:
         debug_stderr(f"get_performance_trends failed: {e}")
         return json.dumps({"error": f" Error: Failed to get performance trends: {str(e)}"}, indent=2)
 
-debug_stderr("✓ All enhanced tool functions defined")
 
 # EVPN Fabric functions
 # - get_org_evpn_topologies: List EVPN fabrics in an org
@@ -4910,7 +4919,7 @@ async def get_org_evpn_topologies(org_id: str) -> str:
             except json.JSONDecodeError:
                 result["message"] = "Retrieved EVPN fabrics but could not parse response"
         
-        debug_stderr("################# ✓ get_org_evpn_topologies completed ################# ")
+        debug_stderr("################# ✅ get_org_evpn_topologies completed ################# ")
         return json.dumps(result, indent=2)
     except Exception as e:
         debug_stderr(f"get_org_evpn_topologies failed: {e}")
@@ -4951,7 +4960,7 @@ async def get_site_evpn_topologies(site_id: str) -> str:
             except json.JSONDecodeError:
                 result["message"] = "Retrieved EVPN fabrics but could not parse response"
         
-        debug_stderr("################# ✓ get_site_evpn_topologies completed ################# ")
+        debug_stderr("################# ✅ get_site_evpn_topologies completed ################# ")
         return json.dumps(result, indent=2)
     except Exception as e:
         debug_stderr(f"get_site_evpn_topologies failed: {e}")
@@ -4987,7 +4996,7 @@ async def get_evpn_topologies_details(topology_id: str, site_specific_fabric: st
             result["conditional_technical_guidance"] = analyze_fabric_and_provide_context(topo_data)
             result["smart_verification_plan"] = verification_plan(topo_data)
         
-        debug_stderr("################# ✓ get_site_evpn_topologies completed ################# ")
+        debug_stderr("################# ✅ get_site_evpn_topologies completed ################# ")
         return json.dumps(result, indent=2)
         
     except Exception as e:
@@ -5057,7 +5066,7 @@ def analyze_fabric_and_provide_context(topo_data: Dict[str, Any]) -> Dict[str, A
                 ]
             }
         
-        debug_stderr("################# ✓ analyze_fabric_and_provide_context completed ################# ")
+        debug_stderr("################# ✅ analyze_fabric_and_provide_context completed ################# ")
         return context
     except Exception as e:
         debug_stderr(f"analyze_fabric_and_provide_context failed: {e}")
@@ -5071,7 +5080,7 @@ def analyze_fabric_and_provide_context(topo_data: Dict[str, Any]) -> Dict[str, A
 
 def get_overlay_specific_recommendations(routing_type: str, overlay_service_types: dict = None) -> List[str]:
     """
-    Get specific recommendations based on overlay type
+    Get specific recommendations based on evpn overlay type
     """
     debug_stderr(f"- Executing get_overlay_specific_recommendations_fixed for {routing_type}")
     
@@ -5109,7 +5118,7 @@ def get_overlay_specific_recommendations(routing_type: str, overlay_service_type
             for char in overlay_data["characteristics"][:3]:  # Limit to top 3
                 recommendations.append(f"Feature: {char}")
         
-        debug_stderr("-  ✓ get_overlay_specific_recommendations_fixed completed ")
+        debug_stderr("-  ✅ get_overlay_specific_recommendations_fixed completed ")
         return recommendations
     
     # Fallback for unknown types
@@ -5163,7 +5172,7 @@ def build_topology_summary(topo_data: Dict, switches: List, pod_names: Dict, evp
                                       if v.get("evpn_anycast", False)]                    
                 })
         
-        debug_stderr(f" - ✓ build_topology_summary completed ...")
+        debug_stderr(f" - ✅ build_topology_summary completed ...")
 
         return {
             "topology_id": topo_data.get("id"),
@@ -5228,11 +5237,10 @@ def get_mist_fabric_type_name(routing_type: str) -> str:
 
 def verification_plan(topo_data: Dict[str, Any]) -> Dict[str, Any]:
     """VTEP-aware verification plan based on fabric architecture
-    IMPORTANT: For BGP fabric analysis, use search_org_bgp_stats() first!
-    This tool should only be used for specific device debugging after 
-    API analysis identifies issues.
+    IMPORTANT: For all EVPN fabric BGP analysis, use search_org_bgp_stats() first!
+    This tool can be used for specific device debugging after 
+    issues have been identified.
     """
-    
     switches = topo_data.get("switches", [])
     evpn_options = topo_data.get("evpn_options", {})
     fabric_type = evpn_options.get("routed_at", "unknown")
@@ -5293,7 +5301,7 @@ def verification_plan(topo_data: Dict[str, Any]) -> Dict[str, Any]:
                 "role": "core", "has_vtep": True,
                 "commands": ["show evpn database", "show interfaces vtep", "show evpn instance extensive", "show lacp interfaces", "show evpn ip-prefix-database"]
             }
-    
+    debug_stderr(f" - ✅ verification plan based on fabric architecture completed ...")
     return verification_plan
 
 def get_vtep_strategy(fabric_type: str) -> str:
@@ -5408,7 +5416,7 @@ async def search_org_wired_clients(
             except json.JSONDecodeError:
                 result["message"] = "Retrieved wired clients but could not parse response"
         
-        debug_stderr("################# ✓ search_org_wired_clients completed #################")
+        debug_stderr("################# ✅ search_org_wired_clients completed #################")
         return json.dumps(result, indent=2)
     except Exception as e:
         debug_stderr(f"search_org_wired_clients failed: {e}")
@@ -5536,7 +5544,7 @@ async def search_org_nac_clients(
             except json.JSONDecodeError:
                 result["message"] = "Retrieved NAC clients but could not parse response"
         
-        debug_stderr("################# ✓ search_org_nac_clients completed #################")
+        debug_stderr("################# ✅ search_org_nac_clients completed #################")
         return json.dumps(result, indent=2)
     except Exception as e:
         debug_stderr(f"search_org_nac_clients failed: {e}")
@@ -5634,7 +5642,7 @@ async def search_org_wireless_clients(
             except json.JSONDecodeError:
                 result["message"] = "Retrieved wireless clients but could not parse response"
         
-        debug_stderr("################# ✓ search_org_wireless_clients completed #################")
+        debug_stderr("################# ✅ search_org_wireless_clients completed #################")
         return json.dumps(result, indent=2)
     except Exception as e:
         debug_stderr(f"search_org_wireless_clients failed: {e}")
@@ -5681,22 +5689,22 @@ def main():
         
         debug_stderr("Parsing command line arguments...")
         args = parser.parse_args()
-        debug_stderr(f"✓ Arguments parsed: transport={args.transport}, host={args.host}, port={args.port}")
+        debug_stderr(f"✅ Arguments parsed: transport={args.transport}, host={args.host}, port={args.port}")
         
         # Set logging level
         log_level = logging.DEBUG if args.debug else getattr(logging, args.log_level)
         logging.getLogger().setLevel(log_level)
-        debug_stderr(f"✓ Logging level set to: {args.log_level}")
+        debug_stderr(f"✅ Logging level set to: {args.log_level}")
         
         # Validate configuration
         debug_stderr("Validating comprehensive configuration...")
-        debug_stderr(f"✓ Base URL: {CONFIG.base_url}")
-        debug_stderr(f"✓ WebSocket support: {CONFIG.websockets_available}")
-        debug_stderr(f"✓ API token configured: {bool(CONFIG.api_token)}")
-        debug_stderr(f"✓ Max concurrent requests: {CONFIG.max_concurrent_requests}")
-        debug_stderr(f"✓ Request timeout: {CONFIG.request_timeout}s")
-        debug_stderr(f"✓ Security mode: {'STRICT' if security_analyzer.strict_mode else 'PERMISSIVE'}")
-        debug_stderr(f"✓ Security thresholds: {security_analyzer.risk_thresholds}")
+        debug_stderr(f"✅ Base URL: {CONFIG.base_url}")
+        debug_stderr(f"✅ WebSocket support: {CONFIG.websockets_available}")
+        debug_stderr(f"✅ API token configured: {bool(CONFIG.api_token)}")
+        debug_stderr(f"✅ Max concurrent requests: {CONFIG.max_concurrent_requests}")
+        debug_stderr(f"✅ Request timeout: {CONFIG.request_timeout}s")
+        debug_stderr(f"✅ Security mode: {'STRICT' if security_analyzer.strict_mode else 'PERMISSIVE'}")
+        debug_stderr(f"✅ Security thresholds: {security_analyzer.risk_thresholds}")
         
         if args.security_check:
             debug_stderr("Security check requested - use analyze_token_security tool for detailed analysis")
@@ -5715,9 +5723,9 @@ def main():
                 
                 validation_result = asyncio.run(validate())
                 if validation_result:
-                    debug_stderr("✓ Configuration validation PASSED - API connectivity confirmed")
-                    print("✓ Configuration validation PASSED")
-                    print("✓ Security controls initialized")
+                    debug_stderr("✅ Configuration validation PASSED - API connectivity confirmed")
+                    print("✅ Configuration validation PASSED")
+                    print("✅ Security controls initialized")
                 else:
                     debug_stderr("✗ Configuration validation FAILED - API connectivity issues")
                     print("✗ Configuration validation FAILED")
@@ -5733,7 +5741,7 @@ def main():
         # Create enhanced API client
         try:
             get_api_client()
-            debug_stderr("✓ Enhanced Comprehensive Secure Mist API client initialized successfully")
+            debug_stderr("✅ Enhanced Comprehensive Secure Mist API client initialized successfully")
             if not CONFIG.websockets_available:
                 debug_stderr("⚠ WebSocket library not available - shell commands will be disabled")
                 debug_stderr("  Install websockets with: pip install websockets")
@@ -5746,7 +5754,7 @@ def main():
         # Show comprehensive tool registration status
         if hasattr(mcp, '_tools'):
             tool_count = len(mcp._tools)
-            debug_stderr(f"✓ {tool_count} enhanced tools registered successfully")
+            debug_stderr(f"✅ {tool_count} enhanced tools registered successfully")
             
             # Group tools by category
             tool_categories = {}
@@ -5811,7 +5819,7 @@ def main():
                 raise ValueError(f"Unsupported transport: {args.transport}")
                 
         except KeyboardInterrupt:
-            debug_stderr("✓ Server interrupted by user (Ctrl+C) - shutting down gracefully")
+            debug_stderr("✅ Server interrupted by user (Ctrl+C) - shutting down gracefully")
         except Exception as e:
             debug_stderr(f"✗ FATAL: Failed to start Enhanced Secure MCP server: {e}")
             debug_stderr(f"Traceback: {traceback.format_exc()}")
@@ -5836,7 +5844,7 @@ def main():
             if api_client:
                 try:
                     asyncio.run(api_client.close())
-                    debug_stderr("✓ Enhanced API client closed successfully")
+                    debug_stderr("✅ Enhanced API client closed successfully")
                 except Exception as e:
                     debug_stderr(f"Error closing enhanced API client: {e}")
             
@@ -5984,7 +5992,7 @@ def run_web_server(host: str, port: int, transport: str, ssl_cert: str = None, s
     else:
         protocol = "http"
     
-    debug_stderr(f"✓ Server endpoints:")
+    debug_stderr(f"✅ Server endpoints:")
     debug_stderr(f"  Health: {protocol}://{host}:{port}/health")
     debug_stderr(f"  Tools:  {protocol}://{host}:{port}/tools")
     if transport == 'sse':
