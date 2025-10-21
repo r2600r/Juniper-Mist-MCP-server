@@ -3727,7 +3727,7 @@ async def get_site_stats(
     start: int = None,
     end: int = None,
     duration: str = "1d",
-    device_type: str = "ap",
+    device_type: str = "all",
     mxedge_id: str = None,
     client_mac: str = None
 ) -> str:
@@ -3824,9 +3824,15 @@ async def get_site_stats(
     - "beacons": BLE beacon statistics at site level
     - "discovered_switches": Discovered switches statistics (SEARCH ONLY)
 
+    CRITICAL NOTES:
+    ---------------
+    - bgp_peers and ports endpoints will FAIL if called without /search or /count suffix
+    - Always specify limit parameter to control response size in large deployments
+    - Duration parameter: use relative time ("1d") or absolute timestamps (start/end)
+
     Use Cases:
     - Comprehensive site health monitoring with specialized focus areas
-    - Device fleet management and performance optimization across device types
+    - Devices and device performance statistic across all device types with filtering
     - Wifi MX Edge stats
     - Wireless clients statistics
     - BGP peer statistics for WAN edge devices and switches in Campus fabrics
@@ -3878,6 +3884,9 @@ async def get_site_stats(
         # Device type filter for device stats
         if stats_type == "devices" and device_type:
             params["type"] = device_type
+        else: 
+            # For other stats types, device_type filter is not applicable
+            params["type"] = "all"
 
         debug_stderr(f"API endpoint: {endpoint}")
         debug_stderr(f"Parameters: {params}")

@@ -1,5 +1,5 @@
 CLAUDE.md
 __pycache__/
 .env
-.vscode/
-lib/
+.vscode/settings.json
+lib/MIST-API.json

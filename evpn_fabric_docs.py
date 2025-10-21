@@ -32,8 +32,15 @@ EVPN_ORG_TOOL_DOC = """
     API Used: GET /api/v1/orgs/{org_id}/evpn_topologies?for_site=any
 
     CRITICAL: 
-    1. EVPN fabric health must include BGP peers status, Instead of inefficient queary by eahc device via execute_custom_shell_command, use search_org_bgp_stats() to provide farbric overlay/underlay status!
-    2. No need for side_id parameter, as ?for_site=any organization fabrics will return all fabrics in any sites within the organization with site_id included in the response
+    1. Before calling this tool, you MUST check user privileges from get_user_info:
+        - Look at access_summary.total_organizations or access_summary.read_org_count
+        - If total_organizations = 0 OR read_org_count = 0: DO NOT CALL THIS TOOL
+        - You will receive 403 Forbidden
+        - Use get_site_evpn_topologies instead with your site_id
+    2. EVPN fabric health must include BGP peers status, Instead of inefficient query by each device via execute_custom_shell_command, 
+        - use search_org_bgp_stats() to provide farbric overlay/underlay status if total_organizations > 0 OR read_org_count > 0! Using search_org_bgp_stats() with total_organizations = 0 OR read_org_count = 0 will result in code 403 "You do not have permission to perform this action"
+        - use get_site_stats() with stats_type=bgp_peers to provide fabric overlay/underlay status if token access permission are specific site only!
+    3. No need for side_id parameter, as ?for_site=any organization fabrics will return all fabrics in any sites within the organization with site_id included in the response
 
     EVPN Fabric Architecture Understanding:
     =====================================
@@ -331,6 +338,13 @@ CRITICAL TOOL FOR EVPN FABRIC HEALTH ANALYSIS
 Function: Retrieve and analyze BGP peer statistics across the entire organization.
 This is the PRIMARY tool for validating BGP state on any device or EVPN fabric control plane health.
 
+CRITICAL ACCESS CHECK REQUIRED:
+Before calling this tool, you MUST check user privileges from get_user_info:
+- Look at access_summary.total_organizations
+- If total_organizations = 0: DO NOT use org_id parameter
+- Use site_id parameter instead (from access_summary.total_sites)
+- Org-level queries will fail with 403 Forbidden
+
 EVPN FABRIC HEALTH WORKFLOW - ALWAYS USE THIS TOOL:
 ========================================================
 When analyzing EVPN fabric health , this tool and other vitals tools in following order should be called IMMEDIATELY after 
@@ -349,6 +363,14 @@ Other tools to use AFTER BGP check:
 - check wireless client events for any issues if the are any AP in same site
 - check NAC events for any issues if dot1x is used and configured in the fabric
 
+Decision Logic:
+1. ALWAYS call get_user_info first
+2. Check access_summary:
+   - IF total_organizations > 0: Use org_id from privileges
+   - IF total_organizations = 0 AND total_sites > 0: Use site_id
+   - IF both = 0: Cannot retrieve BGP data - use get_site_stats with stats_type=bgp_peers instead
+3. Construct API call with correct scope 
+4. Analyze BGP peer states and health metrics
 
 EVPN FABRIC HEALTH CHECK - RECOMMENDED USAGE:
 ==============================================
@@ -449,7 +471,7 @@ Example Workflow for EVPN Fabric Health Check:
 
 GET_ORG_STATS_TOOL_DOC = """
 
-    ORGANIZATION TOOL #2: Enhanced Organization Statistics Analyzer with Multiple Stats Types
+    ORGANIZATION TOOL #2: Organization Statistics Analyzer with Multiple Stats Types
     
     Function: Retrieves comprehensive statistics and metrics for a specific organization
               with support for multiple specialized statistics endpoints including general stats,
