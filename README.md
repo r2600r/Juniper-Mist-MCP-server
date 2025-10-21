@@ -1,4 +1,4 @@
-# Enhanced Mist Cloud MCP Server
+# Juniper Mist MCP Server
 
 ## Overview
 
@@ -39,8 +39,8 @@ Offers ability to troubleshoot individual devices via shell command over if no R
 ## Architecture
 
 ### Core Components
-- **Enhanced MCP Server** (`enhanced_mist_mcp_server.py`) - Main server with 35+ tools
-- **EVPN Documentation Module** (`evpn_fabric_docs.py`) - Technical knowledge base with Juniper best practices
+- **Enhanced MCP Server** (`juniper_mist_mcp_server.py`) - Main server with 35+ tools
+- **EVPN Documentation Module** (`evpn_fabric_docs.py`) - Technical knowledge base and descritpion for tools to influence llm logic
 
 ### Security Framework
 - **Privilege Security Analyzer** - Detects dangerous token permissions
@@ -97,7 +97,7 @@ MIST_MAX_ORGS_PER_MSP=5           # Max orgs per MSP
 
 4. **Validate configuration**
    ```bash
-   python enhanced_mist_mcp_server.py --validate-config
+   python juniper_mist_mcp_server.py --validate-config
    ```
 
 ## Usage
@@ -105,22 +105,22 @@ MIST_MAX_ORGS_PER_MSP=5           # Max orgs per MSP
 ### Basic Startup
 ```bash
 # Default stdio transport (most common for MCP)
-python enhanced_mist_mcp_server.py
-python enhanced_mist_mcp_server.py --transport stdio
+python juniper_mist_mcp_server.py
+python juniper_mist_mcp_server.py --transport stdio
  
 # HTTP/SSE transport on specific port
-python enhanced_mist_mcp_server.py -t sse -p 8080
+python juniper_mist_mcp_server.py -t sse -p 8080
 
 # HTTP transport
-python enhanced_mist_mcp_server.py -t http -H 0.0.0.0 -p 8080
+python juniper_mist_mcp_server.py -t http -H 0.0.0.0 -p 8080
 
 # HTTPS transport
-python enhanced_mist_mcp_server.py -t sse -p 8443 --ssl-cert /path/to/cert.pem --ssl-key /path/to/key.pem
+python juniper_mist_mcp_server.py -t sse -p 8443 --ssl-cert /path/to/cert.pem --ssl-key /path/to/key.pem
 ```
 
 ### Advanced Options
 ```bash
-python enhanced_mist_mcp_server.py \
+python juniper_mist_mcp_server.py \
   --host 127.0.0.1 \
   --port 30040 \
   --log-level DEBUG \
@@ -264,13 +264,13 @@ pip3 install websockets
 **API Authentication Errors**
 ```bash
 # Validate configuration
-python3 enhanced_mist_mcp_server.py --validate-config
+python3 juniper_mist_mcp_server.py --validate-config
 ```
 
 **Security Blocking**
 ```bash
 # Check token privileges
-python3 enhanced_mist_mcp_server.py --security-check
+python3 juniper_mist_mcp_server.py --security-check
 
 # Override if needed (after risk assessment)
 export MIST_SECURITY_RISKS_ACKNOWLEDGED=true
@@ -278,7 +278,7 @@ export MIST_SECURITY_RISKS_ACKNOWLEDGED=true
 
 ### Debug Mode
 ```bash
-python3 enhanced_mist_mcp_server.py --debug --log-level DEBUG
+python3 juniper_mist_mcp_server.py --debug --log-level DEBUG
 ```
 
 ## Version History

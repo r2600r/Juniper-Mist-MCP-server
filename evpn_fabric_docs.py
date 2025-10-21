@@ -4,7 +4,6 @@ EVPN Fabric Architecture Documentation Module
 ==============================================
 
 Dedicated documentation module containing comprehensive EVPN fabric knowledge
-extracted from Juniper Networks Data Center EVPN-VXLAN Fabric Architecture Guide.
 
 This module provides structured documentation that the MCP server can reference
 while keeping the main server code minimal and focused.
