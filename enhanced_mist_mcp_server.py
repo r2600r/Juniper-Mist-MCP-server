@@ -3720,7 +3720,104 @@ async def get_site_wlans(site_id: str) -> str:
 
 @safe_tool_definition("get_site_stats", "site")
 async def get_site_stats(site_id: str, metric: str = None) -> str:
-    """Get comprehensive site statistics and performance metrics"""
+    """
+    SITE TOOL : SITE Statistics Analyzer with Multiple Stats Types
+    
+    Function: Retrieves statistics and metrics for a specific site
+              with support for multiple specialized statistics endpoints including general stats,
+              apps, assets, devices, MX edges, and other infrastructure components with flexible 
+              time range and filtering controls
+    
+    API ENDPOINTS - OPERATION SUPPORT MATRIX:
+    =========================================
+    Different endpoints support different operations. Pay close attention to allowed operations:
+
+    FULL SUPPORT (Direct GET + /search + /count):
+    - GET /api/v1/orgs/{site_id}/stats
+      * Direct: Returns minimal org info (site_id, msp_id, num_sites, num_devices)
+
+    STANDARD ENDPOINTS (Direct GET only):
+    - GET /api/v1/orgs/{site_id}/stats/assets (asset tracking and management statistics)
+    - GET /api/v1/orgs/{site_id}/stats/devices (device-specific statistics across all device types)
+    - GET /api/v1/orgs/{site_id}/stats/sites (site-level aggregated statistics)
+    - GET /api/v1/orgs/{site_id}/stats/beacons (site-level beacons)
+
+    RESTRICTED - SEARCH/COUNT ONLY (NO direct GET):
+    - GET /api/v1/orgs/{site_id}/stats/apps/count (stats of the Applications used on side)
+    - GET /api/v1/orgs/{site_id}/stats/bgp_peers/(search|count) - BGP peering statistics
+    - GET /api/v1/orgs/{site_id}/stats/ports/(search|count) - Wired port statistics
+
+    RESTRICTED - ID-BASED ONLY (NO direct GET, requires mxedge_id):
+    - GET /api/v1/orgs/{site_id}/stats/mxedges/{mxedge_id} - Specific MX Edge statistics
+    - GET /api/v1/orgs/{site_id}/stats/mxedges - List all MX Edges (direct call supported)
+    - GET /api/v1/orgs/{site_id}/stats/clients/{client_mac} - Specific Wirelles client statistics
+    - GET /api/v1/orgs/{site_id}/stats/clients - List of Site All Clients Stats Details (direct call supported)
+
+
+    SPECIAL ENDPOINTS:
+    - GET /api/v1/orgs/{site_id}/stats/discovered_switches/(search|count|metrics) - statistics about the Discovered Switches at the Site level
+    
+    
+    Parameters:
+    - site_id (str): site ID to retrieve statistics for (required)
+    - stats_type (str): Type of statistics to retrieve (default: "general")
+                       Valid values: "general", "assets", "devices", "mxedges", "bgp_peers", 
+                                   "sites", "clients", "tunnels", "wireless", "wired"
+    - page (int): Page number for pagination (default: 1)
+    - limit (int): Maximum number of entries per page (default: 100, max: 1000)
+    - start (int): Start time as Unix timestamp (optional, overrides duration)
+    - end (int): End time as Unix timestamp (optional, used with start)
+    - duration (str): Time period when start/end not specified (default: "1d")
+                     Valid values: "1h", "1d", "1w", "1m"
+    - device_type (str): Filter by device type for device stats (ap, switch, gateway, mxedge,all), default ap for devices stats
+    
+    
+    Response Handling:
+    - Returns JSON with site metrics and statistics based on type
+    - Shows total counts, performance metrics, and time-series data for the specified type
+    - Includes specialized metrics per stats type (assets: tracking/location, devices: health/performance)
+    - Reports network performance statistics over specified time range
+    - Contains Service Level Expectation (SLE) metrics where applicable
+    - Shows alarm and event summary statistics for the time period
+    - Supports pagination for large datasets with next page indicators
+    
+    Time Range Logic:
+    - If start & end provided: Uses specific timestamp range (Unix timestamps)
+    - If only duration provided: Uses relative time period from now
+    - Default duration: "1d" (last 24 hours)
+    - Statistics data updated every 10 minutes, recommended 1-hour intervals for trends
+    
+    Enhanced Features:
+    - Multi-endpoint support for specialized statistics types
+    - Flexible time range control (absolute timestamps or relative duration)
+    - Pagination support for large sites with many resources
+    - Device-type filtering for focused analysis
+    - Site-scoped statistics for multi-site sites
+    - Trend analysis compared to previous periods using time series data
+    - Performance benchmarking against org baselines over time
+    - Geographic distribution of resources and usage patterns
+    - Health score calculation and reporting with historical context
+    - Resource utilization efficiency metrics with time-based analysis
+    - Enhanced error handling and fallback mechanisms
+    
+    Stats Type Descriptions:
+    - "general": Overall site id,number of sites, number of devices does not contains health, sites, devices, users, performance or statistics metrics. Ignore num_devices_connected and num_devices_disconnected
+    - "assets": Asset tracking, location services, asset management metrics
+    - "devices": Device health, Device clients stats, performance, connectivity across device types, only if device_type=all, returns all device types statistics, else only device_type=ap
+    - "mxedges": MX Edge(Mist WIFI concentrator) specific stats, requires mxedge_id for specific edge stats
+    - "bgp_peers": BGP routing statistics, peer status, route advertisements (SEARCH/COUNT ONLY)
+    - "sites": Site-level aggregated information, number of devices connected/disconnected by type, rf template id, ap template id, gateway template id, switch template id, geografical latitude/longitude and address
+    - "ports": Wired port statistics at site level (SEARCH/COUNT ONLY - see details below)
+    - "clients": Wirelles clients statistics at site level
+
+    Use Cases:
+    - Comprehensive site health monitoring with specialized focus areas
+    - Device fleet management and performance optimization across device types
+    - Wifi MX Edge stats
+    - Wireless clients statistics
+    - BGP peer statistics for Wan edge devices and switches in Campus fabrics
+        
+    """
     try:
         debug_stderr(f"Executing get_site_stats for site {site_id}...")
         client = get_api_client()
@@ -3835,7 +3932,8 @@ async def get_device_stats(site_id: str, device_id: str = None, metric: str = No
     Output with only tpe can be large depending on number of devices in site 
     
     API Used: GET /api/v1/sites/{site_id}/stats/devices/{device_id} or /api/v1/sites/{site_id}/stats/devices
-    Type of device can be specified for bulk site retrieval.Exmaple are "switch", "ap", "gateway". Default Type is "ap"
+    Type of device can be specified for bulk site retrieval.Exmaple are "all","switch", "ap", "gateway". Default Type is "ap"
+    Recommended to use type=all for bulk site statistic or device_id for specific device stats retrieval
 
     Returns detailed device statistics including:
     - junos version

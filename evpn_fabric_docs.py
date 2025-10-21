@@ -172,10 +172,11 @@ SITE_DEVICES_TOOL_DOC = """
 
     API: GET /api/v1/sites/{site_id}/devices
 
-    Parameters: site_id (required), device_type (optional, defaults to "ap")
-    WARNING: Without device_type, only returns APs. For all configs, call separately for each type.
-    Returns: Device configurations for specified type only
-    Use: Get actual device configurations after knowing what types exist
+    Parameters: site_id (required), device_type (optional, defaults to "ap", other types: "switch","gateway","mxedge","all")
+    WARNING: Without device_type, only returns APs.
+    Returns: Device configurations for specified type, if type "all" is used, returns all device types configurations in the site
+    Use: Get specific device configurations with device_id from inventory response, GET /api/v1/sites/{site_id}/devices/device_id
+    or all devices configurations in the site with device_type all, GET /api/v1/sites/{site_id}/devices?type=all
 
     Function: Get device configurations for a site by type with gateway template integration
     API: GET /api/v1/sites/{site_id}/devices + GET /api/v1/orgs/org_id/gatewaytemplates
@@ -533,7 +534,7 @@ GET_ORG_STATS_TOOL_DOC = """
     - "devices": Device health, performance, connectivity across device types, only if device_type=all, returns all device types statistics, else only device_type=ap
     - "mxedges": MX Edge(Mist WIFI concentrator) specific stats, requires mxedge_id for specific edge stats
     - "bgp_peers": BGP routing statistics, peer status, route advertisements (SEARCH/COUNT ONLY)
-    - "sites": Site-level aggregated statistics and performance metrics, number of devices connected/disconnected by type, rf template id, ap template id, gateway template id, switch template id, geografical latitude/longitude and address
+    - "sites": Site-level aggregated information, number of devices connected/disconnected by type, rf template id, ap template id, gateway template id, switch template id, geografical latitude/longitude and address
     - "tunnels": AP to MX edge tunnel statistics for Wifi traffic (SEARCH/COUNT ONLY)
     - "vpn_peers": VPN peer statistics for WAN Assurance (SEARCH/COUNT ONLY - see details below)
     - "ports": Wired port statistics at organization level (SEARCH/COUNT ONLY - see details below)
