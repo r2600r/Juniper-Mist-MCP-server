@@ -41,7 +41,7 @@ from functools import wraps
 import traceback
 import psutil
 import statistics
-from evpn_fabric_docs import get_tool_documentation, get_technical_fact
+from evpn_fabric_docs import get_tool_documentation, get_technical_fact, get_fabric_health_indicators
 
 # ==============================================
 # DEBUGGING INFRASTRUCTURE
@@ -3719,59 +3719,71 @@ async def get_site_wlans(site_id: str) -> str:
         return json.dumps({"error": f" Error: Failed to get site WLANs: {str(e)}"}, indent=2)
 
 @safe_tool_definition("get_site_stats", "site")
-async def get_site_stats(site_id: str, metric: str = None) -> str:
+async def get_site_stats(
+    site_id: str,
+    stats_type: str = "general",
+    page: int = 1,
+    limit: int = 100,
+    start: int = None,
+    end: int = None,
+    duration: str = "1d",
+    device_type: str = "ap",
+    mxedge_id: str = None,
+    client_mac: str = None
+) -> str:
     """
     SITE TOOL : SITE Statistics Analyzer with Multiple Stats Types
-    
+
     Function: Retrieves statistics and metrics for a specific site
               with support for multiple specialized statistics endpoints including general stats,
-              apps, assets, devices, MX edges, and other infrastructure components with flexible 
+              apps, assets, devices, MX edges, and other infrastructure components with flexible
               time range and filtering controls
-    
+
     API ENDPOINTS - OPERATION SUPPORT MATRIX:
     =========================================
     Different endpoints support different operations. Pay close attention to allowed operations:
 
     FULL SUPPORT (Direct GET + /search + /count):
-    - GET /api/v1/orgs/{site_id}/stats
-      * Direct: Returns minimal org info (site_id, msp_id, num_sites, num_devices)
+    - GET /api/v1/sites/{site_id}/stats
+      * Direct: Returns minimal site info (site_id, num_devices, etc.)
 
     STANDARD ENDPOINTS (Direct GET only):
-    - GET /api/v1/orgs/{site_id}/stats/assets (asset tracking and management statistics)
-    - GET /api/v1/orgs/{site_id}/stats/devices (device-specific statistics across all device types)
-    - GET /api/v1/orgs/{site_id}/stats/sites (site-level aggregated statistics)
-    - GET /api/v1/orgs/{site_id}/stats/beacons (site-level beacons)
+    - GET /api/v1/sites/{site_id}/stats/assets (asset tracking and management statistics)
+    - GET /api/v1/sites/{site_id}/stats/devices (device-specific statistics across all device types)
+    - GET /api/v1/sites/{site_id}/stats/beacons (site-level beacons)
 
     RESTRICTED - SEARCH/COUNT ONLY (NO direct GET):
-    - GET /api/v1/orgs/{site_id}/stats/apps/count (stats of the Applications used on side)
-    - GET /api/v1/orgs/{site_id}/stats/bgp_peers/(search|count) - BGP peering statistics
-    - GET /api/v1/orgs/{site_id}/stats/ports/(search|count) - Wired port statistics
+    - GET /api/v1/sites/{site_id}/stats/apps/count (stats of the Applications used on site)
+    - GET /api/v1/sites/{site_id}/stats/bgp_peers/search - BGP peering statistics
+    - GET /api/v1/sites/{site_id}/stats/ports/search - Wired port statistics
 
     RESTRICTED - ID-BASED ONLY (NO direct GET, requires mxedge_id):
-    - GET /api/v1/orgs/{site_id}/stats/mxedges/{mxedge_id} - Specific MX Edge statistics
-    - GET /api/v1/orgs/{site_id}/stats/mxedges - List all MX Edges (direct call supported)
-    - GET /api/v1/orgs/{site_id}/stats/clients/{client_mac} - Specific Wirelles client statistics
-    - GET /api/v1/orgs/{site_id}/stats/clients - List of Site All Clients Stats Details (direct call supported)
+    - GET /api/v1/sites/{site_id}/stats/mxedges/{mxedge_id} - Specific MX Edge statistics
+    - GET /api/v1/sites/{site_id}/stats/mxedges - List all MX Edges (direct call supported)
+    - GET /api/v1/sites/{site_id}/stats/clients/{client_mac} - Specific Wireless client statistics
+    - GET /api/v1/sites/{site_id}/stats/clients - List of Site All Clients Stats Details (direct call supported)
 
 
     SPECIAL ENDPOINTS:
-    - GET /api/v1/orgs/{site_id}/stats/discovered_switches/(search|count|metrics) - statistics about the Discovered Switches at the Site level
-    
-    
+    - GET /api/v1/sites/{site_id}/stats/discovered_switches/search - statistics about the Discovered Switches at the Site level
+
+
     Parameters:
     - site_id (str): site ID to retrieve statistics for (required)
     - stats_type (str): Type of statistics to retrieve (default: "general")
-                       Valid values: "general", "assets", "devices", "mxedges", "bgp_peers", 
-                                   "sites", "clients", "tunnels", "wireless", "wired"
+                       Valid values: "general", "assets", "devices", "mxedges", "bgp_peers",
+                                   "clients", "ports", "apps", "beacons", "discovered_switches"
     - page (int): Page number for pagination (default: 1)
     - limit (int): Maximum number of entries per page (default: 100, max: 1000)
     - start (int): Start time as Unix timestamp (optional, overrides duration)
     - end (int): End time as Unix timestamp (optional, used with start)
     - duration (str): Time period when start/end not specified (default: "1d")
                      Valid values: "1h", "1d", "1w", "1m"
-    - device_type (str): Filter by device type for device stats (ap, switch, gateway, mxedge,all), default ap for devices stats
-    
-    
+    - device_type (str): Filter by device type for device stats (ap, switch, gateway, mxedge, all), default: "ap"
+    - mxedge_id (str): Specific MX Edge ID when stats_type="mxedges" (optional)
+    - client_mac (str): Specific client MAC address when stats_type="clients" (optional)
+
+
     Response Handling:
     - Returns JSON with site metrics and statistics based on type
     - Shows total counts, performance metrics, and time-series data for the specified type
@@ -3780,13 +3792,13 @@ async def get_site_stats(site_id: str, metric: str = None) -> str:
     - Contains Service Level Expectation (SLE) metrics where applicable
     - Shows alarm and event summary statistics for the time period
     - Supports pagination for large datasets with next page indicators
-    
+
     Time Range Logic:
     - If start & end provided: Uses specific timestamp range (Unix timestamps)
     - If only duration provided: Uses relative time period from now
     - Default duration: "1d" (last 24 hours)
     - Statistics data updated every 10 minutes, recommended 1-hour intervals for trends
-    
+
     Enhanced Features:
     - Multi-endpoint support for specialized statistics types
     - Flexible time range control (absolute timestamps or relative duration)
@@ -3799,53 +3811,136 @@ async def get_site_stats(site_id: str, metric: str = None) -> str:
     - Health score calculation and reporting with historical context
     - Resource utilization efficiency metrics with time-based analysis
     - Enhanced error handling and fallback mechanisms
-    
+
     Stats Type Descriptions:
-    - "general": Overall site id,number of sites, number of devices does not contains health, sites, devices, users, performance or statistics metrics. Ignore num_devices_connected and num_devices_disconnected
+    - "general": Overall site basic info (site_id, num_devices) - does not contain detailed health/performance metrics
     - "assets": Asset tracking, location services, asset management metrics
-    - "devices": Device health, Device clients stats, performance, connectivity across device types, only if device_type=all, returns all device types statistics, else only device_type=ap
-    - "mxedges": MX Edge(Mist WIFI concentrator) specific stats, requires mxedge_id for specific edge stats
-    - "bgp_peers": BGP routing statistics, peer status, route advertisements (SEARCH/COUNT ONLY)
-    - "sites": Site-level aggregated information, number of devices connected/disconnected by type, rf template id, ap template id, gateway template id, switch template id, geografical latitude/longitude and address
-    - "ports": Wired port statistics at site level (SEARCH/COUNT ONLY - see details below)
-    - "clients": Wirelles clients statistics at site level
+    - "devices": Device health, device clients stats, performance, connectivity across device types
+    - "mxedges": MX Edge (Mist WIFI concentrator) specific stats, optionally for specific mxedge_id
+    - "bgp_peers": BGP routing statistics, peer status, route advertisements (SEARCH ONLY)
+    - "clients": Wireless clients statistics at site level, optionally for specific client_mac
+    - "ports": Wired port statistics at site level (SEARCH ONLY)
+    - "apps": Application usage statistics (COUNT ONLY)
+    - "beacons": BLE beacon statistics at site level
+    - "discovered_switches": Discovered switches statistics (SEARCH ONLY)
 
     Use Cases:
     - Comprehensive site health monitoring with specialized focus areas
     - Device fleet management and performance optimization across device types
     - Wifi MX Edge stats
     - Wireless clients statistics
-    - BGP peer statistics for Wan edge devices and switches in Campus fabrics
-        
+    - BGP peer statistics for WAN edge devices and switches in Campus fabrics
+
     """
     try:
-        debug_stderr(f"Executing get_site_stats for site {site_id}...")
+        debug_stderr(f"Executing get_site_stats for site {site_id}, stats_type={stats_type}...")
         client = get_api_client()
-        endpoint = f"/api/v1/sites/{site_id}/stats"
-        
+
+        # Build endpoint based on stats_type
+        if stats_type == "general":
+            endpoint = f"/api/v1/sites/{site_id}/stats"
+        elif stats_type == "mxedges" and mxedge_id:
+            endpoint = f"/api/v1/sites/{site_id}/stats/mxedges/{mxedge_id}"
+        elif stats_type == "clients" and client_mac:
+            endpoint = f"/api/v1/sites/{site_id}/stats/clients/{client_mac}"
+        elif stats_type in ["bgp_peers", "ports", "discovered_switches"]:
+            # These require /search endpoint
+            endpoint = f"/api/v1/sites/{site_id}/stats/{stats_type}/search"
+        elif stats_type == "apps":
+            # Apps only supports /count
+            endpoint = f"/api/v1/sites/{site_id}/stats/apps/count"
+        elif stats_type in ["assets", "devices", "mxedges", "clients", "beacons"]:
+            endpoint = f"/api/v1/sites/{site_id}/stats/{stats_type}"
+        else:
+            return json.dumps({
+                "error": f"Invalid stats_type: {stats_type}",
+                "valid_types": ["general", "assets", "devices", "mxedges", "bgp_peers",
+                               "clients", "ports", "apps", "beacons", "discovered_switches"]
+            }, indent=2)
+
+        # Build parameters
         params = {}
-        if metric:
-            params["metric"] = metric
-        
+
+        # Time range parameters
+        if start is not None and end is not None:
+            params["start"] = start
+            params["end"] = end
+        elif duration:
+            params["duration"] = duration
+
+        # Pagination parameters (not for count endpoints)
+        if stats_type != "apps":
+            if limit and limit <= 1000:
+                params["limit"] = limit
+            if page and page > 0:
+                params["page"] = page
+
+        # Device type filter for device stats
+        if stats_type == "devices" and device_type:
+            params["type"] = device_type
+
+        debug_stderr(f"API endpoint: {endpoint}")
+        debug_stderr(f"Parameters: {params}")
+
         result = await client.make_request(endpoint, params=params)
-        
+
         if result.get("status") == "SUCCESS":
             try:
                 stats_data = json.loads(result.get("response_data", "{}"))
                 result["site_stats"] = stats_data
-                result["message"] = f"Retrieved site statistics for {site_id}"
-                
-                if metric:
-                    result["metric"] = metric
-                
+                result["stats_type"] = stats_type
+                result["message"] = f"Retrieved {stats_type} statistics for site {site_id}"
+
+                # Add metadata about the query
+                result["query_info"] = {
+                    "site_id": site_id,
+                    "stats_type": stats_type,
+                    "time_range": {
+                        "start": start,
+                        "end": end,
+                        "duration": duration
+                    } if start and end else {"duration": duration},
+                    "pagination": {
+                        "page": page,
+                        "limit": limit
+                    } if stats_type != "apps" else None,
+                    "filters": {}
+                }
+
+                if stats_type == "devices" and device_type:
+                    result["query_info"]["filters"]["device_type"] = device_type
+                if mxedge_id:
+                    result["query_info"]["filters"]["mxedge_id"] = mxedge_id
+                if client_mac:
+                    result["query_info"]["filters"]["client_mac"] = client_mac
+
+                # Add helpful statistics summary if data is a list
+                if isinstance(stats_data, list):
+                    result["summary"] = {
+                        "total_records": len(stats_data),
+                        "page": page,
+                        "limit": limit
+                    }
+                elif isinstance(stats_data, dict) and "results" in stats_data:
+                    result["summary"] = {
+                        "total_records": len(stats_data.get("results", [])),
+                        "page": page,
+                        "limit": limit,
+                        "total_available": stats_data.get("total", "unknown")
+                    }
+
             except json.JSONDecodeError:
                 result["message"] = "Retrieved site stats but could not parse response"
-        
+
         debug_stderr("################# ✅ get_site_stats completed ################# ")
         return json.dumps(result, indent=2)
     except Exception as e:
         debug_stderr(f"get_site_stats failed: {e}")
-        return json.dumps({"error": f" Error: Failed to get site stats: {str(e)}"}, indent=2)
+        return json.dumps({
+            "error": f"Failed to get site stats: {str(e)}",
+            "site_id": site_id,
+            "stats_type": stats_type
+        }, indent=2)
 
 @safe_tool_definition("get_site_insights", "site")
 async def get_site_insights(site_id: str, metric: str = None) -> str:
@@ -5160,10 +5255,76 @@ def analyze_fabric_and_provide_context(topo_data: Dict[str, Any]) -> Dict[str, A
                     "Ensure unique AS numbers per device for EBGP",
                     "Configure default route(0.0.0.0/0 or ::/0) advertisement in evpn_underlay_export/ evpn_underlay_umport policy if in-band management is required(most campus evpn fabrics)",
                     "Check for ecmp settings in BGP"
-                    "Enable BFD for fast convergence (1000ms underlay, 3000ms overlay)"                    
+                    "Enable BFD for fast convergence (1000ms underlay, 3000ms overlay)"
                 ]
             }
-        
+
+        # Analyze fabric version for Type-2/Type-5 coexistence capability
+        debug_stderr(f"         - Analyzing Type-2/Type-5 coexistence capability for the topology ...")
+        overlay_options = evpn_options.get("overlay", {})
+        fabric_version = overlay_options.get("version")
+        if fabric_version:
+            type2_type5_info = get_technical_fact('type_2_type_5_coexistence')
+            if type2_type5_info:
+                coexistence_enabled = False
+                coexistence_requirements = []
+
+                # Determine if coexistence is enabled based on fabric version and routing type
+                if routing_type in ["edge", "distribution"] and fabric_version >= 3:
+                    coexistence_enabled = True
+                    coexistence_requirements.append(f"Fabric version {fabric_version} >= 3: Automatic Type-2/Type-5 coexistence enabled")
+                elif routing_type == "collapsed-core" and fabric_version >= 5:
+                    coexistence_enabled = True
+                    coexistence_requirements.append(f"Fabric version {fabric_version} >= 5: Automatic Type-2/Type-5 coexistence enabled for collapsed-core")
+
+                context["type2_type5_coexistence"] = {
+                    "fabric_version": fabric_version,
+                    "routing_type": routing_type,
+                    "coexistence_enabled": coexistence_enabled,
+                    "overview": type2_type5_info.get("overview", ""),
+                    "requirements_status": coexistence_requirements,
+                    "configuration_requirements": type2_type5_info.get("configuration_requirements", []),
+                    "mist_automation": type2_type5_info.get("mist_automation", []),
+                    "scaling_benefits": "QFX5120: 56k → 200k IPv4 ARP entries with coexistence" if coexistence_enabled else "Standard MAC-VRF scaling limits apply"
+                }
+
+        # Add Campus Fabric Architecture mapping
+        debug_stderr(f"         - Analyzing campus fabric architecture for the topology ...")
+        if routing_type:
+            campus_architectures = get_technical_fact('campus_fabric_architectures')
+            if campus_architectures:
+                # Map routing_type to campus architecture
+                architecture_map = {
+                    "edge": "ip_clos",
+                    "distribution": "core_distribution_erb",
+                    "core": "core_distribution_crb",
+                    "collapsed-core": "evpn_multihoming"
+                }
+
+                arch_key = architecture_map.get(routing_type)
+                if arch_key and arch_key in campus_architectures:
+                    arch_info = campus_architectures[arch_key]
+                    context["campus_fabric_architecture"] = {
+                        "detected_architecture": arch_key,
+                        "description": arch_info.get("description", ""),
+                        "routing_type": arch_info.get("routing_type", ""),
+                        "characteristics": arch_info.get("characteristics", []),
+                        "mist_workflow": arch_info.get("mist_workflow", ""),
+                        "use_cases": arch_info.get("use_cases", []),
+                        "configuration_guidance": f"This fabric follows the {arch_info.get('mist_workflow', '')} pattern"
+                    }
+
+        # Add Mist-specific features and capabilities
+        debug_stderr(f"         - Adding Mist-specific features and AI operations context ...")
+        mist_features = get_technical_fact('mist_specific_features')
+        if mist_features:
+            context["mist_platform_capabilities"] = {
+                "automation_capabilities": mist_features.get("automation_capabilities", []),
+                "ai_operations": mist_features.get("ai_operations", []),
+                "monitoring_integration": mist_features.get("monitoring_integration", []),
+                "guidance": "Leverage Marvis AI for fabric troubleshooting and anomaly detection"
+            }
+
         debug_stderr("################# ✅ analyze_fabric_and_provide_context completed ################# ")
         return context
     except Exception as e:
@@ -5399,6 +5560,29 @@ def verification_plan(topo_data: Dict[str, Any]) -> Dict[str, Any]:
                 "role": "core", "has_vtep": True,
                 "commands": ["show evpn database", "show interfaces vtep", "show evpn instance extensive", "show lacp interfaces", "show evpn ip-prefix-database"]
             }
+
+    # Add fabric health indicators for troubleshooting guidance
+    debug_stderr(f" - Adding fabric health indicators to verification plan ...")
+    health_indicators = get_fabric_health_indicators()
+    if health_indicators:
+        verification_plan["health_check_guidance"] = {
+            "healthy_fabric_signs": health_indicators.get("healthy_fabric_signs", []),
+            "common_issues_to_check": {
+                "bgp_peering": health_indicators.get("common_issues", {}).get("bgp_peering_failures", []),
+                "evpn_overlay": health_indicators.get("common_issues", {}).get("evpn_overlay_issues", []),
+                "vxlan_dataplane": health_indicators.get("common_issues", {}).get("vxlan_dataplane_issues", []),
+                "mist_platform": health_indicators.get("common_issues", {}).get("mist_platform_specific", [])
+            },
+            "troubleshooting_workflow": [
+                "1. Verify all BGP sessions are established (check healthy_fabric_signs)",
+                "2. Validate EVPN route advertisement/receipt across fabric",
+                "3. Confirm VXLAN tunnel establishment between VTEPs",
+                "4. Check for MAC learning issues or duplicate detections",
+                "5. Review Mist platform-specific configuration (templates, workflows)",
+                "6. Use Marvis AI for automated anomaly detection and root cause analysis"
+            ]
+        }
+
     debug_stderr(f" - ✅ verification plan based on fabric architecture completed ...")
     return verification_plan
 
